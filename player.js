@@ -3423,6 +3423,56 @@ function roleStyle(component, unit, colors = {}) {
     declarations.push(`--lm-${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}:${key === "indicatorStroke" ? indicator.stroke : value}px`);
   return declarations.join(";");
 }
+var deviation = (radius) => round(Math.max(0, radius) / 2);
+var PLAYING_EDGE = "rgba(0, 0, 0, .9)";
+var NAV_GLOWS = Object.freeze({ dot: 7, dotHeld: 9, pressRing: 1.5, press: 8, pressHeld: 12, playing: 1.5 });
+var FILTER_REACH = Object.freeze({ small: 2, lit: 1, wide: 0.5 });
+var modDimFilter = () => `<filter id="layout2-mod-dim" x="-.5" y="-.5" width="2" height="2" color-interpolation-filters="sRGB"><feColorMatrix type="saturate" values=".3"/><feComponentTransfer><feFuncA type="linear" slope=".22"/></feComponentTransfer></filter>`;
+function filterRegion(reach, box = null) {
+  if (box)
+    return `filterUnits="userSpaceOnUse" x="${round(box.x)}" y="${round(box.y)}" width="${round(box.width)}" height="${round(box.height)}"`;
+  return `x="${-reach}" y="${-reach}" width="${1 + reach * 2}" height="${1 + reach * 2}"`;
+}
+var shadow = (radius, color, opacity = 1) => `<feDropShadow dx="0" dy="0" stdDeviation="${deviation(radius)}"${opacity < 1 ? ` flood-opacity="${opacity}"` : ""} style="flood-color:${color}"/>`;
+function ownGlow(radius, step, from = "SourceGraphic") {
+  return `<feGaussianBlur in="${from}" stdDeviation="${deviation(radius)}" result="b${step}"/><feMerge result="g${step}"><feMergeNode in="b${step}"/><feMergeNode in="${from}"/></feMerge>`;
+}
+function roleFilters(style, unit, { edge: edge2 = 0, box = null } = {}) {
+  const glow = roleSizes(unit).glow, grown = box && { x: box.x - glow * 6, y: box.y - glow * 6, width: box.width + glow * 12, height: box.height + glow * 12 };
+  const key = `${style}|${unit}|${edge2}|${grown ? Object.values(grown).map(round).join(",") : ""}`;
+  let hash = 5381;
+  for (let at = 0;at < key.length; at += 1)
+    hash = (hash * 33 ^ key.charCodeAt(at)) >>> 0;
+  const declared = Object.fromEntries(String(style).split(";").map((entry) => {
+    const at = entry.indexOf(":");
+    return [entry.slice(0, at).trim(), entry.slice(at + 1).trim()];
+  }));
+  const read = (name) => declared[name] || "var(--accent-2)";
+  const id = `lmf${hash.toString(36)}`, highlight = read("--lm-highlight-color"), handle = read("--lm-handle");
+  const filters = {
+    on: [FILTER_REACH.lit, shadow(glow, read("--lm-press-on-color"))],
+    wash: [FILTER_REACH.wide, shadow(glow, read("--lm-handle-wash"))],
+    self: [FILTER_REACH.small, ownGlow(glow, 1), grown],
+    halo: [FILTER_REACH.small, ownGlow(glow * 0.75, 1) + ownGlow(glow * 1.75, 2, "g1"), grown],
+    ring: [FILTER_REACH.wide, ownGlow(glow, 1) + ownGlow(glow * 2.5, 2, "g1")],
+    record: [FILTER_REACH.wide, shadow(glow, read("--lm-recording-color"))],
+    outline: [FILTER_REACH.wide, shadow(glow, highlight)],
+    dot: [FILTER_REACH.small, shadow(NAV_GLOWS.dot, handle, 0.75)],
+    "dot-held": [FILTER_REACH.small, shadow(NAV_GLOWS.dotHeld, handle, 0.9)],
+    press: [FILTER_REACH.small, shadow(NAV_GLOWS.pressRing, highlight) + shadow(NAV_GLOWS.press, highlight, 0.85)],
+    "press-held": [FILTER_REACH.small, shadow(NAV_GLOWS.pressRing, highlight) + shadow(NAV_GLOWS.pressHeld, highlight, 0.9)],
+    playing: [FILTER_REACH.small, shadow(NAV_GLOWS.playing, PLAYING_EDGE)],
+    ...edge2 > 0 ? { edge: [FILTER_REACH.wide, `<feGaussianBlur stdDeviation="${round(edge2)}"/>`] } : {}
+  };
+  const names = Object.keys(filters);
+  return {
+    style: names.map((name) => `--lm-f-${name}:url(#${id}-${name})`).join(";"),
+    defs: `<defs class="layout2-filters">${names.map((name) => {
+      const [reach, body, region] = filters[name];
+      return `<filter id="${id}-${name}" ${filterRegion(reach, region)} color-interpolation-filters="sRGB">${body}</filter>`;
+    }).join("")}</defs>`
+  };
+}
 var TIER_CONTRAST = Object.freeze({ value: 4.5, label: 4.5, symbol: 3, helper: 3, glyph1: 3, glyph3: 3, glyph2: 2, guide: 1.5, divider: 1.3, highlight: 3, indicator: 3 });
 
 // library/ui/palette.js
@@ -3670,11 +3720,11 @@ function useFilter(definition) {
   return BLUR.filters.get(definition);
 }
 function blurred([x, y, width, height], unit, content) {
-  const deviation = fine(BLUR.share / unit);
-  if (!(Number(deviation) > 0))
+  const deviation2 = fine(BLUR.share / unit);
+  if (!(Number(deviation2) > 0))
     return content;
   const edge2 = BLUR.share / unit * 3, region = `x="${fine(x - edge2)}" y="${fine(y - edge2)}" width="${fine(width + edge2 * 2)}" height="${fine(height + edge2 * 2)}"`;
-  const definition = `filterUnits="userSpaceOnUse" ${region}><feGaussianBlur stdDeviation="${deviation}"/>`;
+  const definition = `filterUnits="userSpaceOnUse" ${region}><feGaussianBlur stdDeviation="${deviation2}"/>`;
   return `<g filter="url(#${useFilter(definition)})">${content}</g>`;
 }
 var blurFilters = (filters) => filters.size ? `<svg width="0" height="0">${[...filters].map(([definition, id]) => `<filter id="${id}" ${definition}</filter>`).join("")}</svg>` : "";
@@ -11154,8 +11204,8 @@ function labelOutline(style) {
   const color = tokens.filter((token) => token !== sized).join(" ");
   return color ? { color, width: sized ? Math.min(6, parseFloat(sized)) : 1 } : null;
 }
-function styleShadow(shadow) {
-  const value = String(shadow || "").trim();
+function styleShadow(shadow2) {
+  const value = String(shadow2 || "").trim();
   if (!value || value === "none")
     return "";
   let depth = 0;
@@ -11221,23 +11271,62 @@ function textStyleVariables(styles) {
       variables[`--lm-${kind}-case`] = style.transform;
     if (outlined)
       Object.assign(variables, { [`--lm-${kind}-outline`]: plain(outlined.color), [`--lm-${kind}-outline-width`]: `${+(outlined.width * 2 / size).toFixed(4)}em` });
-    if (shadowed)
-      variables[`--lm-${kind}-shadow`] = `drop-shadow(${plain(shadowed)})`;
+    const shadow2 = textFilter([], shadowed);
+    if (shadow2)
+      variables[`--lm-${kind}-shadow`] = `url(#${shadow2.id})`;
   }
   return variables;
 }
 var TEXT_STYLE_VARIABLES = Object.freeze(TEXT_KINDS.flatMap(({ id: kind }) => ["family", "weight", "size", "tracking", "case", "outline", "outline-width", "shadow"].map((part) => `--lm-${kind}-${part}`)));
 var textStyleVars = (styles) => Object.entries(textStyleVariables(styles)).map(([name, value]) => `${name}:${value}`).join(";");
 var kindClass = (kind) => `lm-text-${textStyleId(kind).slice(5)}`;
-var kindGlow = (kind, glow) => glow ? `filter:${glow} var(--lm-${kind}-shadow,)` : "";
-var textMark = (attributes, content) => `<text${attributes}>${content}</text>`;
-function textShadow(style, glow = "") {
-  const shadowed = styleShadow(style?.shadow);
-  return shadowed ? `filter:${glow ? `${glow} ` : ""}drop-shadow(${shadowed});` : glow ? `filter:${glow};` : "";
+function textFilter(glows = [], shadow2 = "", box = null) {
+  const drop = (dx, dy, radius, color) => `<feDropShadow dx="${fixed(dx)}" dy="${fixed(dy)}" stdDeviation="${fixed(Math.max(0, radius) / 2)}" style="flood-color:${plain(color)}"/>`;
+  const parts = glows.filter(([radius]) => radius > 0).map(([radius, color]) => drop(0, 0, radius, color));
+  const shadowed = styleShadow(shadow2);
+  if (shadowed) {
+    const lengths = [], color = [];
+    let depth = 0;
+    for (const token of shadowed.split(/(\s+|[()])/)) {
+      if (!depth && /^-?\d*\.?\d+px$/.test(token) && lengths.length < 3) {
+        lengths.push(parseFloat(token));
+        continue;
+      }
+      if (token === "(")
+        depth += 1;
+      else if (token === ")")
+        depth = Math.max(0, depth - 1);
+      color.push(token);
+    }
+    if (lengths.length >= 2)
+      parts.push(drop(lengths[0], lengths[1], lengths[2] || 0, color.join("").trim() || "currentColor"));
+  }
+  if (!parts.length)
+    return null;
+  const region = box ? `filterUnits="userSpaceOnUse" x="${fixed(box.x)}" y="${fixed(box.y)}" width="${fixed(box.width)}" height="${fixed(box.height)}"` : `x="-2" y="-2" width="5" height="5"`;
+  const body = parts.join(""), key = `${region}${body}`;
+  let hash = 5381;
+  for (let at = 0;at < key.length; at += 1)
+    hash = (hash * 33 ^ key.charCodeAt(at)) >>> 0;
+  const id = `lmt${hash.toString(36)}`;
+  return { id, markup: `<filter id="${id}" ${region} color-interpolation-filters="sRGB">${body}</filter>` };
 }
-function wordAttributes(className, kind, glow = "") {
-  const style = kindGlow(kind, glow);
-  return ` class="${className} ${kindClass(kind)}"${style ? ` style="${style}"` : ""}`;
+function textStyleFilters(styles) {
+  const filters = new Map;
+  for (const { id: kind } of TEXT_KINDS) {
+    const filter2 = textFilter([], textStyleOf(styles, kind).shadow);
+    if (filter2)
+      filters.set(filter2.id, filter2.markup);
+  }
+  return [...filters.values()].join("");
+}
+var textMark = (attributes, content) => `<text${attributes}>${content}</text>`;
+function textShadow(style, glows = []) {
+  const filter2 = textFilter(glows, style?.shadow);
+  return filter2 ? { declaration: `filter:url(#${filter2.id});`, markup: filter2.markup } : { declaration: "", markup: "" };
+}
+function wordAttributes(className, kind, filter2 = null) {
+  return ` class="${className} ${kindClass(kind)}"${filter2 ? ` style="filter:url(#${filter2.id})"` : ""}`;
 }
 function fontFaces(project3, resolveUrl = (url) => url) {
   const catalog = (project3?.design?.fontCatalog || []).filter((font) => font.url).map((font) => `@font-face{font-family:"${font.family}";src:url("${resolveUrl(font.url)}")${font.format ? ` format("${font.format}")` : ""};font-weight:${font.weight || 400};font-style:normal;font-display:swap}`);
@@ -11399,7 +11488,7 @@ function labelUnit(label, geometry) {
   return label.strokeUnit !== undefined ? num(label.strokeUnit, REFERENCE_UNIT) : cellPageScale(geometry) * REFERENCE_UNIT;
 }
 var LABEL_GLOW = Object.freeze([0.25, 0.6]);
-var labelGlow = (size, color) => LABEL_GLOW.map((share) => `drop-shadow(0 0 ${+(size * share).toFixed(3)}px ${color})`).join(" ");
+var labelGlow = (size, color) => LABEL_GLOW.map((share) => [+(size * share).toFixed(3), color]);
 function cellLabelPlacement(label, geometry, height = 0) {
   return label.zone === "edge" ? edgeLabelPlacement(geometry, label, height) : { ...cellMapPoint(geometry, label.x, label.y), angle: label.rotation };
 }
@@ -11414,13 +11503,13 @@ function renderGlyphLabel(label, geometry, cell, options) {
   const outlined = labelOutline(style), outline = outlined ? outlined.color : "transparent";
   const ghost = label.glyph?.ghost === true, lit = label.highlighted === true, tiered = labelTier(label, ghost ? "glyph2" : "symbol"), color = tiered ? `var(--lm-${tiered}-color)` : options.componentColors?.[colorRole("glyphs")] || style.color;
   const zoneClass = label.highlighted === undefined ? "" : lit ? " label-highlighted" : " label-dimmed";
-  const glow = lit ? labelGlow(height, color) : "";
-  const shadowed = styleShadow(style.shadow), shadow = shadowed ? `filter:${glow ? `${glow} ` : ""}drop-shadow(${shadowed});` : glow ? `filter:${glow};` : "";
+  const reach = height * 2, filter2 = textFilter(lit ? labelGlow(height, color) : [], style.shadow, { x: -width / 2 - reach, y: -height / 2 - reach, width: width + reach * 2, height: height + reach * 2 });
+  const shadow2 = filter2 ? `filter:url(#${filter2.id});` : "";
   const editorAttributes = options.editor ? ` data-layout2-item-type="${label.zone === "edge" ? "edge-label" : "component-label"}" data-layout2-item-id="${label.id}" data-layout2-cell-id="${cell.id}"` : "";
   const strokeWidth = roleSizes(unit).drawingStroke;
   const filled = glyphDefinition(state.a)?.filled === true && glyphDefinition(state.b)?.filled === true;
   const stroke = filled ? ` style="stroke:${color};fill:${color}"` : tiered ? ` style="stroke:${color}"` : ` stroke="${color}"`;
-  return `<g class="layout2-cell-label layout2-glyph-label ${isSelected(options, label) ? "selected" : ""}${zoneClass}" data-label-id="${esc(label.id)}"${editorAttributes}${label.zone === "edge" ? ` data-edge-height="${+height.toFixed(3)}"` : ""} transform="translate(${point.x} ${point.y}) rotate(${point.angle})" opacity="${label.color || tiered ? 1 : style.opacity * label.opacity}" style="${shadow}">${options.editor ? `<rect class="layout2-glyph-hit layout2-editor-only" x="${-width / 2}" y="${-height / 2}" width="${width}" height="${height}"></rect>` : ""}<polyline class="glyph-outline" points="${glyphPointsAttribute(state.points, width, height)}" stroke="${outline}" stroke-width="${outlined ? strokeWidth + outlined.width * 2 : 0}"></polyline><polyline class="glyph-stroke${ghost && tiered ? " lm-dashed" : ""}" points="${glyphPointsAttribute(state.points, width, height)}"${stroke} stroke-width="${strokeWidth}"></polyline></g>`;
+  return `${filter2 ? filter2.markup : ""}<g class="layout2-cell-label layout2-glyph-label ${isSelected(options, label) ? "selected" : ""}${zoneClass}" data-label-id="${esc(label.id)}"${editorAttributes}${label.zone === "edge" ? ` data-edge-height="${+height.toFixed(3)}"` : ""} transform="translate(${point.x} ${point.y}) rotate(${point.angle})" opacity="${label.color || tiered ? 1 : style.opacity * label.opacity}" style="${shadow2}">${options.editor ? `<rect class="layout2-glyph-hit layout2-editor-only" x="${-width / 2}" y="${-height / 2}" width="${width}" height="${height}"></rect>` : ""}<polyline class="glyph-outline" points="${glyphPointsAttribute(state.points, width, height)}" stroke="${outline}" stroke-width="${outlined ? strokeWidth + outlined.width * 2 : 0}"></polyline><polyline class="glyph-stroke${ghost && tiered ? " lm-dashed" : ""}" points="${glyphPointsAttribute(state.points, width, height)}"${stroke} stroke-width="${strokeWidth}"></polyline></g>`;
 }
 function edgeLabelTextPath(label, geometry, height = 0) {
   const { points, startOffset } = edgeLabelPath(geometry, label, height);
@@ -11452,16 +11541,16 @@ function renderLabelWords(label, geometry, cell, options, kind, edgeHeight = nul
   const face = `${textStroke(style)}${textFont(style)}`;
   const lit = label.highlighted === true, tiered = labelTier(label, "label"), color = tiered ? `var(--lm-${tiered}-color)` : placedLabelColor(label, style, options);
   const zoneClass = label.highlighted === undefined ? "" : lit ? " label-highlighted" : " label-dimmed";
-  const glow = lit ? labelGlow(num(style.fontSize, 18), color) : "";
-  const shadow = `${tiered ? `fill:${color};` : ""}${textShadow(style, glow)}`;
+  const lighted = textShadow(style, lit ? labelGlow(num(style.fontSize, 18), color) : []);
+  const shadow2 = `${tiered ? `fill:${color};` : ""}${lighted.declaration}`;
   const fill = tiered ? "" : ` fill="${color}"`;
   const editorAttributes = options.editor ? ` data-layout2-item-type="${label.zone === "edge" ? "edge-label" : "component-label"}" data-layout2-item-id="${label.id}" data-layout2-cell-id="${cell.id}"` : "";
   const height = label.zone === "edge" ? +(edgeHeight ?? num(style.fontSize, 18)).toFixed(3) : 0;
   const edge2 = label.zone === "edge" ? edgeLabelTextPath(label, geometry, height) : null;
   const common = `class="layout2-cell-label ${isSelected(options, label) ? "selected" : ""}" data-label-id="${esc(label.id)}"${editorAttributes}${fill} fill-opacity="${label.color || tiered ? 1 : style.opacity * label.opacity}"${face} text-anchor="middle" dominant-baseline="central"`;
   if (edge2)
-    return `<path class="layout2-edge-label-path" id="${edge2.id}" d="${edge2.d}" fill="none" stroke="none"></path>${textMark(` ${common} data-edge-height="${height}" style="${shadow}"`, `<textPath href="#${edge2.id}" startOffset="${edge2.startOffset}">${text}</textPath>`)}`;
-  return textMark(` class="layout2-cell-label ${isSelected(options, label) ? "selected" : ""}${zoneClass}" data-label-id="${esc(label.id)}"${editorAttributes} x="${point.x}" y="${point.y}"${fill} fill-opacity="${label.color || lit || tiered ? 1 : style.opacity * label.opacity}"${face} text-anchor="middle" dominant-baseline="central" transform="rotate(${point.angle} ${point.x} ${point.y})" style="${shadow}"`, text);
+    return `${lighted.markup}<path class="layout2-edge-label-path" id="${edge2.id}" d="${edge2.d}" fill="none" stroke="none"></path>${textMark(` ${common} data-edge-height="${height}" style="${shadow2}"`, `<textPath href="#${edge2.id}" startOffset="${edge2.startOffset}">${text}</textPath>`)}`;
+  return lighted.markup + textMark(` class="layout2-cell-label ${isSelected(options, label) ? "selected" : ""}${zoneClass}" data-label-id="${esc(label.id)}"${editorAttributes} x="${point.x}" y="${point.y}"${fill} fill-opacity="${label.color || lit || tiered ? 1 : style.opacity * label.opacity}"${face} text-anchor="middle" dominant-baseline="central" transform="rotate(${point.angle} ${point.x} ${point.y})" style="${shadow2}"`, text);
 }
 var BUTTON_LABEL_ACTION = "mod.toggle";
 var BUTTON_ADVANCE = 0.62;
@@ -11485,7 +11574,8 @@ function renderButtonLabel(label, geometry, cell, options) {
   const { points, unit, height } = buttonLabelFrame(label, geometry, cell, options);
   const d = `M${points.map((point) => `${+point.x.toFixed(2)},${+point.y.toFixed(2)}`).join("L")}Z`;
   const text = renderLabelWords({ ...label, ...on ? { highlighted: true } : {} }, geometry, cell, options, "edge", height);
-  return `<g class="layout2-mod-button${on ? " mod-on" : ""}" data-label-action="${BUTTON_LABEL_ACTION}" data-button-label-id="${esc(label.id)}" data-cell-id="${esc(cell.id)}" style="${roleStyle(null, unit, { [colorRole("text")]: color, [colorRole("lines")]: options.componentColors?.[colorRole("lines")] || color, ground: options.sheetColor })}">${on ? `<path class="lm-role-press lm-wash" d="${d}"></path>` : ""}<path class="layout2-mod-button-frame lm-role-glyph1" d="${d}"></path>${text}</g>`;
+  const roles = roleStyle(null, unit, { [colorRole("text")]: color, [colorRole("lines")]: options.componentColors?.[colorRole("lines")] || color, ground: options.sheetColor }), filters = roleFilters(roles, unit);
+  return `${filters.defs}<g class="layout2-mod-button${on ? " mod-on" : ""}" data-label-action="${BUTTON_LABEL_ACTION}" data-button-label-id="${esc(label.id)}" data-cell-id="${esc(cell.id)}" style="${roles};${filters.style}">${on ? `<path class="lm-role-press lm-wash" d="${d}"></path>` : ""}<path class="layout2-mod-button-frame lm-role-glyph1" d="${d}"></path>${text}</g>`;
 }
 function renderConnectionLabel(label, geometry, cell, options) {
   options = renderOptions(options);
@@ -11851,7 +11941,7 @@ function notePadDrawing(words, display, className, { options, cell, corners, geo
   const fixed2 = (value) => Number(value).toFixed(2);
   marks("label", words.map((word) => {
     const pose = readableWordPose(word, map, steps);
-    return glowWord(word, pose.point, fixed2, className, pose);
+    return glowWord(word, pose.point, fixed2, className, { component, geometry, options }, pose);
   }).join(""));
   marks("value", padWordMarks([display], map, steps, "component", "value"));
   if (options.editor)
@@ -11860,14 +11950,14 @@ function notePadDrawing(words, display, className, { options, cell, corners, geo
 }
 var portamentoPadDrawing = (context) => notePadDrawing(portamentoPadWords(context.component), portamentoPadDisplay(context.component), "portamento-pad-word", context);
 var pitchShiftPadDrawing = (context) => notePadDrawing(pitchShiftPadWords(context.component), pitchShiftPadDisplay(context.component), "pitch-shift-pad-word", context);
-function glideShiftPadDrawing({ component, map, polygon, steps, options, dot: dot2 }) {
+function glideShiftPadDrawing({ component, geometry, map, polygon, steps, options, dot: dot2 }) {
   const pad2 = normalizeGlideShiftPad(component.glideShiftPad), fixed2 = (value) => Number(value).toFixed(2);
   const lines = glideShiftPadLines(component.corners, steps), shortened = glideShiftPadLines(component.corners, steps, NOTE_PAD_LAYOUT.lineEnd);
   const line = (points, dashed) => `<polyline class="lm-role-divider${dashed ? " lm-dashed" : ""}" points="${polygon(points.map((point) => map(point.x, point.y)))}"></polyline>`;
   const marks = tierMarks()("divider", line(lines.divider, false) + line(shortened.glide, true) + line(shortened.shift, true));
   marks("label", glideShiftPadWords(component).map((word) => {
     const pose = readableWordPose(word, map, steps);
-    return glowWord(word, pose.point, fixed2, "glide-shift-pad-word", pose);
+    return glowWord(word, pose.point, fixed2, "glide-shift-pad-word", { component, geometry, options }, pose);
   }).join(""));
   marks("value", padWordMarks(glideShiftPadDisplays(component), map, steps, "component", "value"));
   const live = GLIDE_SHIFT_PAD_REGIONS.map((name) => {
@@ -11979,11 +12069,11 @@ var chorusWavesPoints = (component, at) => {
   const wanted = drawnExtent(at).height / CURVE_POINT_SPACING;
   return chorusPadWaves(component, chorusWaveSteps(component, wanted)).map((points) => pointsAttribute(points, at));
 };
-function pabfoPadDrawing({ component, map, steps, options, dot: dot2 }) {
+function pabfoPadDrawing({ component, geometry, map, steps, options, dot: dot2 }) {
   const pad2 = normalizePabfoPad(component.pabfoPad), shape = pabfoPadGeometry(component), fixed2 = (value) => Number(value).toFixed(2);
   const marks = tierMarks()("label", shape.ratioWords.map((word) => {
     const pose = readableWordPose(word, map, steps);
-    return glowWord(word, pose.point, fixed2, "pabfo-pad-ratio-word", pose);
+    return glowWord(word, pose.point, fixed2, "pabfo-pad-ratio-word", { component, geometry, options }, pose);
   }).join(""));
   marks("label", padWordMarks(shape.words, map, steps, "component"));
   const clock = (options.pabfoPadClocks || PABFO_PAD_CLOCKS).get(component.id) || createPabfoPadClock();
@@ -12355,14 +12445,14 @@ function rotaryPadParts(component, map, polygon, options, dot2) {
   const held = options.rotaryHeld?.componentId === component.id && ROTARY_PAD_REGIONS.includes(options.rotaryHeld.region) ? ` data-rotary-held="${options.rotaryHeld.region}"` : "";
   return { marks, live: `<g class="rotary-pad-hover"${held}>${hover}${dots}</g>` };
 }
-function glowWord(word, point, fixed2, className, pose = null) {
-  const level = clamp(num(word.level), 0, 1), colour = "var(--lm-label-color)";
-  const glow = level > 0.01 ? `drop-shadow(0 0 calc(var(--lm-glow) * ${fixed2(0.75 * level)}) ${colour}) drop-shadow(0 0 calc(var(--lm-glow) * ${fixed2(1.75 * level)}) ${colour})` : "";
+function glowWord(word, point, fixed2, className, { component, geometry, options }, pose = null) {
+  const level = clamp(num(word.level), 0, 1), colour = "var(--lm-label-color)", size = roleSizes(componentUnit(component, geometry)).glow * level;
+  const glow = level > 0.01 ? textFilter([[size * 0.75, colour], [size * 1.75, colour]], textStyleOf(renderOptions(options).labelStyles, "glyph").shadow) : null;
   const head = `${wordAttributes(`${className} lm-role-label`, "glyph", glow)} data-lit-word="${word.text.toLowerCase()}"`;
   const tail = ` text-anchor="${pose?.anchor || word.anchor}" dominant-baseline="central" opacity="${fixed2(0.5 + 0.5 * level)}"`;
   if (pose)
-    return posedWordMark(pose, head, tail, word.text);
-  return textMark(`${head} x="${fixed2(point.x)}" y="${fixed2(point.y)}"${tail}`, word.text);
+    return `${glow ? glow.markup : ""}${posedWordMark(pose, head, tail, word.text)}`;
+  return `${glow ? glow.markup : ""}${textMark(`${head} x="${fixed2(point.x)}" y="${fixed2(point.y)}"${tail}`, word.text)}`;
 }
 function lfoPadParts(component, map, polygon, options, sizes, dot2) {
   const pad2 = normalizeLfoPad(component.lfoPad), shape = lfoPadGeometry(), line = (points) => polygon(points.map((point) => map(point.x, point.y)));
@@ -13007,8 +13097,15 @@ function roleColors(component, options) {
   return { ...colors, componentAlpha: groups.componentAlpha, swatches };
 }
 function componentStyle(component, options, geometry, cell = null) {
+  return componentLook(component, options, geometry).style;
+}
+function componentLook(component, options, geometry) {
   const unit = componentUnit(component, geometry), reach = roleSizes(unit).highlightReach * renderOptions(options).highlight.reach / HIGHLIGHT_DEFAULTS.reach;
-  return `${roleStyle(component, unit, roleColors(component, options))};${textStyleVars(renderOptions(options).labelStyles)};--lm-highlight-glow-width:${+(reach * 2).toFixed(3)}px;--lm-highlight-blur:${+(reach * 0.55).toFixed(3)}px`;
+  const roles = roleStyle(component, unit, roleColors(component, options)), outline = componentOutline(component, geometry);
+  const xs = outline.map((point) => point.x), ys = outline.map((point) => point.y), left = Math.min(...xs), top = Math.min(...ys);
+  const filters = roleFilters(roles, unit, { edge: reach * 0.55, box: { x: left, y: top, width: Math.max(...xs) - left, height: Math.max(...ys) - top } });
+  const styles = renderOptions(options).labelStyles, shadows = textStyleFilters(styles);
+  return { style: `${roles};${filters.style};${textStyleVars(styles)};--lm-highlight-glow-width:${+(reach * 2).toFixed(3)}px`, defs: `${filters.defs}${shadows ? `<defs class="layout2-filters">${shadows}</defs>` : ""}` };
 }
 var INDICATOR_SHAPES = ["circle", "triangle", "square", "pentagon", "hexagon", "crosshair"];
 function indicatorMark(component, point, radius, className, attributes = "") {
@@ -13064,7 +13161,8 @@ function renderComponent(cell, component, geometry, options) {
   const role = component.gesture === "motion" ? "group" : "slider";
   const state = role === "slider" ? ` aria-valuemin="0" aria-valuemax="1" aria-valuenow="${clamp(num(component.valueNormalized, 0.5), 0, 1)}"` : "";
   const interactiveAttributes = interactive ? ` data-product-control="" data-product-component-id="${esc(component.id)}" data-product-cell-id="${esc(cell.id)}" tabindex="0" focusable="true" role="${role}" aria-label="${esc(component.name || component.address || "Control")}"${state}` : "";
-  return `<g class="layout2-component ${interactive ? "product-control" : ""} ${isSelected(options, component) ? "selected" : ""}" data-component-id="${esc(component.id)}" data-owner-component-id="${esc(component.id)}" opacity="${component.opacity}" style="${componentStyle(component, options, geometry, cell)}"${editorAttributes}${interactiveAttributes}>${renderComponentContent(component, geometry, { ...options, liveLayer: true }, cell)}</g>`;
+  const look = componentLook(component, options, geometry);
+  return `${look.defs}<g class="layout2-component ${interactive ? "product-control" : ""} ${isSelected(options, component) ? "selected" : ""}" data-component-id="${esc(component.id)}" data-owner-component-id="${esc(component.id)}" opacity="${component.opacity}" style="${look.style}"${editorAttributes}${interactiveAttributes}>${renderComponentContent(component, geometry, { ...options, liveLayer: true }, cell)}</g>`;
 }
 function renderSurfacePattern(id, surface, options) {
   options = renderOptions(options);
@@ -13117,6 +13215,7 @@ function renderCellContentGroup(sheet, cell, options) {
 function cellSelected(cell, options) {
   return isSelected(options, cell) || Boolean(options.editor && options.selection?.cellId === cell.id);
 }
+var sharedFilters = (options) => `${modDimFilter()}${textStyleFilters(options.labelStyles)}`;
 function renderString(sheet, string, options) {
   options = renderOptions(options);
   const a = sheet.pins.find((pin) => pin.id === string.a);
@@ -13145,7 +13244,7 @@ function renderSheetSvg(sheet, options = {}) {
   const windows = options.veilMode === "window" ? new Set(options.veiledCells || []) : new Set;
   const defs = `${options.background && surface.imageUrl ? renderSurfacePattern(`${options.idPrefix}surface-sheet`, surface, options) : ""}${sheet.cells.map((cell) => renderCellDefs(sheet, cell, options)).join("")}`;
   return `<svg class="layout2-network" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${sheet.width} ${sheet.height}" width="${sheet.width}" height="${sheet.height}"${targetingAttributes(options)} aria-label="${esc(options.ariaLabel || "Page layout")}">
-    <defs>${defs}</defs>
+    <defs>${defs}${sharedFilters(options)}</defs>
     ${options.background ? renderSheetBackground(sheet, options) : ""}
     ${sheet.cells.map((cell) => renderCellSurface(sheet, cell, windows.has(cell.id) ? { ...options, windowCell: true } : options)).join("")}
     ${sheet.strings.map((string) => renderString(sheet, string, options)).join("")}
@@ -14173,6 +14272,128 @@ function normalizeScopeModel(component) {
   });
 }
 
+// library/ui/twins.js
+var drives = (slot) => slot && slot.enabled !== false && slot.instanceId && slot.paramId;
+var sameParameter = (a, b) => a.instanceId === b.instanceId && a.paramId === b.paramId;
+function feelPosition(slot, value, near = 0.5, regions = null) {
+  const feel = normalizeTarget(slot), error = (t) => Math.abs(slotValue(feel, t, regions) - value);
+  let best = clamp(num(near, 0.5), 0, 1), bestError = error(best);
+  for (let step = 0;step <= 400; step += 1) {
+    const t = step / 400, e = error(t);
+    if (e < bestError - 0.000000000001 || Math.abs(e - bestError) <= 0.000000000001 && Math.abs(t - near) < Math.abs(best - near)) {
+      best = t;
+      bestError = e;
+    }
+  }
+  let low = Math.max(0, best - 1 / 400), high = Math.min(1, best + 1 / 400);
+  for (let round5 = 0;round5 < 40; round5 += 1) {
+    const a = low + (high - low) / 3, b = high - (high - low) / 3;
+    if (error(a) <= error(b))
+      high = b;
+    else
+      low = a;
+  }
+  const refined = (low + high) / 2;
+  return error(refined) <= bestError ? refined : best;
+}
+var pathPart = (component, path) => {
+  const kind = componentKind(component);
+  return kind === "adsrPad" || kind === "filterPads" || kind === "delayQuadPad" || kind === "roomReverbPad" || kind === "warpChorusPad" || kind === "rotaryPad" || kind === "lfoPad" || kind === "distortionPad" || kind === "glideShiftPad" || kind === "chorusPad" || kind === "pabfoPad" || kind === "panPad" || kind === "duckPad" || kind === "randomPad" || kind === "stepSequencer" || kind === "scope" ? path.region : null;
+};
+function setPathPosition(cell, component, path, t) {
+  const target = clamp(num(t), 0, 1), gesture = component?.gesture;
+  if (!component || !path || gesture === "display" || gesture === "motion")
+    return false;
+  if (gesture !== "point") {
+    setComponentGesture(cell, component, { value: target, x: target, y: num(component.gesturePosition?.y, 0.5) });
+    return true;
+  }
+  if (isRotaryFlipPath(component, path))
+    return setRotaryFlip(component, path.axis, target >= 0.5);
+  const controls = componentControls(component);
+  if (controls)
+    return controls.setPathValue(component, path, target);
+  const part = pathPart(component, path), key = componentType(component).regionKey, region = REGION_PADS[componentKind(component)];
+  const at = region ? region.dot(region.model(component), part) : component.gesturePosition || { x: 0.55, y: 0.45 };
+  const move = (target_, x2, y2) => setComponentGesture(cell, target_, { x: x2, y: y2, ...part && key ? { [key]: part } : {} });
+  const kind = componentKind(component), model = component[kind] && typeof component[kind] === "object" ? kind : null;
+  const valueAt2 = (x2, y2) => {
+    const trial = { ...component, gesturePosition: { ...component.gesturePosition }, ...model ? { [model]: structuredClone(component[model]) } : {} };
+    move(trial, x2, y2);
+    return derivedOutputValue(trial, path);
+  };
+  let x = num(at?.x, 0.5), y = num(at?.y, 0.5);
+  for (let iteration = 0;iteration < 24; iteration += 1) {
+    const value = valueAt2(x, y), miss = target - value;
+    if (Math.abs(miss) < 0.00001)
+      break;
+    const epsilon = 0.001, gx = (valueAt2(x + epsilon, y) - valueAt2(x - epsilon, y)) / (2 * epsilon), gy = (valueAt2(x, y + epsilon) - valueAt2(x, y - epsilon)) / (2 * epsilon);
+    const length = gx * gx + gy * gy;
+    if (length < 0.000000001)
+      break;
+    x = clamp(x + miss * gx / length, 0, 1);
+    y = clamp(y + miss * gy / length, 0, 1);
+  }
+  move(component, x, y);
+  return true;
+}
+function followTwins(cells, moved) {
+  const done = new Set([moved?.id]), queue = moved ? [moved] : [], movedOnes = [];
+  while (queue.length) {
+    const from = queue.shift();
+    const values = list(from.paths).filter((path) => !path.parked).flatMap((path) => {
+      const t = derivedOutputValue(from, path);
+      return list(path.parameters).filter(drives).map((slot) => ({ slot, value: slotValue(normalizeTarget(slot), t, path.regions) }));
+    });
+    if (!values.length)
+      continue;
+    for (const cell of list(cells))
+      for (const other of list(cell?.components)) {
+        if (done.has(other.id))
+          continue;
+        let shares = false, moves = false;
+        for (const twinPath of list(other.paths)) {
+          if (twinPath.parked)
+            continue;
+          let match = null;
+          const twinSlot = list(twinPath.parameters).find((item) => drives(item) && (match = values.find((entry) => sameParameter(item, entry.slot))));
+          if (!twinSlot)
+            continue;
+          shares = true;
+          const now = derivedOutputValue(other, twinPath), wanted = feelPosition(twinSlot, match.value, now, twinPath.regions);
+          if (Math.abs(wanted - now) > 0.00001 && setPathPosition(cell, other, twinPath, wanted))
+            moves = true;
+        }
+        if (!shares)
+          continue;
+        done.add(other.id);
+        if (moves) {
+          movedOnes.push(other);
+          queue.push(other);
+        }
+      }
+  }
+  return movedOnes;
+}
+function twinComponentIds(cells, componentId) {
+  const components = list(cells).flatMap((cell) => list(cell?.components));
+  const driven = new Map(components.map((component) => [component.id, list(component.paths).filter((path) => !path.parked).flatMap((path) => list(path.parameters).filter(drives))]));
+  const shares = (a, b) => driven.get(a).some((slot) => driven.get(b).some((other) => sameParameter(slot, other)));
+  if (!driven.has(componentId))
+    return [];
+  const found = new Set([componentId]), queue = [componentId];
+  while (queue.length) {
+    const from = queue.shift();
+    for (const other of components)
+      if (!found.has(other.id) && shares(from, other.id)) {
+        found.add(other.id);
+        queue.push(other.id);
+      }
+  }
+  found.delete(componentId);
+  return [...found];
+}
+
 // library/ui/mod-cards.js
 var box = (x, y, width, height) => ({ x: round3(x), y: round3(y), width: round3(Math.max(0.001, width)), height: round3(Math.max(0.001, height)) });
 var centre2 = (b) => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 });
@@ -14327,12 +14548,13 @@ function modLook(design) {
   return { weight, style, paint, words, thickness };
 }
 var PLAIN_LOOK = modLook(normalizeModDesign());
+var roleRoot = (options, unit) => `<g style="${escOrBlank(options.roleStyle ? options.roleStyle(unit) : "")}">${options.roleFilters ? options.roleFilters(unit) : ""}`;
 function text(value, b, styles, kind, { anchor = "start", rotate = false, attributes = "", tier = "label" } = {}) {
-  const style = textStyleOf(styles, kind), size = num(style.fontSize, 12), shadow = textShadow(style);
+  const style = textStyleOf(styles, kind), size = num(style.fontSize, 12), shadow2 = textShadow(style);
   const room = rotate ? b.height : b.width, fits = Math.max(1, Math.floor(room / (size * TEXT_CHAR_WIDTH) + 0.000001));
   const words = textCase(style, value), shown = words.length > fits ? `${words.slice(0, Math.max(1, fits - 1))}…` : words;
   const c = centre2(b), x = rotate || anchor === "middle" ? c.x : anchor === "end" ? b.x + b.width : b.x;
-  return textMark(` class="mod-text" x="${round3(x)}" y="${round3(c.y)}" dominant-baseline="central" text-anchor="${rotate ? "middle" : anchor}"${rotate ? ` transform="rotate(-90 ${round3(c.x)} ${round3(c.y)})"` : ""}${textStroke(style)}${textFont(style)} style="${shadow}fill:var(--lm-${escOrBlank(tier)}-color)" pointer-events="none"${attributes ? ` ${attributes}` : ""}`, `<tspan>${escOrBlank(shown)}</tspan><title>${escOrBlank(words)}</title>`);
+  return shadow2.markup + textMark(` class="mod-text" x="${round3(x)}" y="${round3(c.y)}" dominant-baseline="central" text-anchor="${rotate ? "middle" : anchor}"${rotate ? ` transform="rotate(-90 ${round3(c.x)} ${round3(c.y)})"` : ""}${textStroke(style)}${textFont(style)} style="${shadow2.declaration}fill:var(--lm-${escOrBlank(tier)}-color)" pointer-events="none"${attributes ? ` ${attributes}` : ""}`, `<tspan>${escOrBlank(shown)}</tspan><title>${escOrBlank(words)}</title>`);
 }
 var defaultLevelDot = (unit) => `<circle class="mod-level-dot" cx="0" cy="0" r="${round3(roleSizes(unit).indicatorRadius)}"></circle>`;
 function sliderMark(value, b, control, dot2, unit, { range = "bipolar", percent = null, styles = [], attributes = "", format = "", look = PLAIN_LOOK } = {}) {
@@ -14373,7 +14595,7 @@ function renderKfoCardSvg(model, layout, options = {}) {
   const labelText = buttons.label ? say(KFO_CARD_LABELS.solo, box(buttons.label.x, buttons.label.y, buttons.label.width - layout.row * 0.22, buttons.label.height), "kfoLabel", { kind: "component" }) : "";
   const mainLabel = labelText ? `<g class="kfo-label">${labelText}</g>` : "";
   const body = rect(r, "mod-card-body lm-role-surface", `${rx(r)}${look.paint("outline")}`);
-  return `<svg class="mod-card kfo-card" id="layout2-kfo-card" viewBox="${round3(r.x)} ${round3(r.y)} ${round3(r.width)} ${round3(r.height)}" width="${round3(r.width)}" height="${round3(r.height)}"${options.attributes ? ` ${options.attributes}` : ""}><g style="${escOrBlank(options.roleStyle ? options.roleStyle(unit) : "")}">${body}${mainLabel}<g class="kfo-buttons">${record}${play2}${slots}</g></g></svg>`;
+  return `<svg class="mod-card kfo-card" id="layout2-kfo-card" viewBox="${round3(r.x)} ${round3(r.y)} ${round3(r.width)} ${round3(r.height)}" width="${round3(r.width)}" height="${round3(r.height)}"${options.attributes ? ` ${options.attributes}` : ""}>${roleRoot(options, unit)}${body}${mainLabel}<g class="kfo-buttons">${record}${play2}${slots}</g></g></svg>`;
 }
 function rotateMark(b, look) {
   const at = centre2(b), s = Math.min(b.width, b.height) * 0.2, r0 = s * 0.9 * 2, end = { x: at.x - r0, y: at.y }, head = s;
@@ -14415,7 +14637,7 @@ function renderKfoPatternsSvg(model, layout, patterns = [], options = {}) {
     const turn = controls.get(`kfo-rotate:${index + 1}`), rotate = card.rotate ? `<g class="mod-control kfo-button kfo-pattern-rotate${turn ? "" : " disabled"}" ${controlAttributes(turn)} role="button" aria-label="Rotate pattern ${index + 1} one corner">${hit(card.rotate)}${rotateButtonMarks(card.rotate, rotateButtonGeometry(card.rotate, pattern.family, pattern.rotation), look)}</g>` : "";
     return `<g class="mod-control kfo-button kfo-pattern${classes}" ${controlAttributes(control)} role="button" aria-label="Pattern ${index + 1}"${off ? ' aria-disabled="true"' : ""}>${rect(b, "mod-card-body lm-role-surface", `${rx(b)}${look.paint("outline")}`)}${hit(b)}${art}${ring}${number}</g>${rotate}`;
   }).join("");
-  return `<svg class="mod-card kfo-card kfo-patterns" id="layout2-kfo-patterns" viewBox="${round3(r.x)} ${round3(r.y)} ${round3(r.width)} ${round3(r.height)}" width="${round3(r.width)}" height="${round3(r.height)}"${options.attributes ? ` ${options.attributes}` : ""}><g style="${escOrBlank(options.roleStyle ? options.roleStyle(unit) : "")}">${cards}</g></svg>`;
+  return `<svg class="mod-card kfo-card kfo-patterns" id="layout2-kfo-patterns" viewBox="${round3(r.x)} ${round3(r.y)} ${round3(r.width)} ${round3(r.height)}" width="${round3(r.width)}" height="${round3(r.height)}"${options.attributes ? ` ${options.attributes}` : ""}>${roleRoot(options, unit)}${cards}</g></svg>`;
 }
 var PALETTE_CARD_WORDS = Object.freeze({
   category: "Category",
@@ -14545,7 +14767,7 @@ function renderPaletteCardSvg(model, layout, options = {}) {
     button(buttons.import, "pal-import", W.import),
     button(buttons.export, "pal-export", W.export)
   ].join("");
-  return `<svg class="mod-card palette-card" id="layout2-palette-card" viewBox="${round3(r.x)} ${round3(r.y)} ${round3(r.width)} ${round3(r.height)}" width="${round3(r.width)}" height="${round3(r.height)}"${options.attributes ? ` ${options.attributes}` : ""}><g style="${escOrBlank(options.roleStyle ? options.roleStyle(unit) : "")}">${body(r)}${dividers}${headings}<g class="palette-card-list" data-palette-list="category">${categories}</g><g class="palette-card-list" data-palette-list="preset">${presets}${empty}</g><g class="palette-card-pages">${pages}</g>${actions}</g></svg>`;
+  return `<svg class="mod-card palette-card" id="layout2-palette-card" viewBox="${round3(r.x)} ${round3(r.y)} ${round3(r.width)} ${round3(r.height)}" width="${round3(r.width)}" height="${round3(r.height)}"${options.attributes ? ` ${options.attributes}` : ""}>${roleRoot(options, unit)}${body(r)}${dividers}${headings}<g class="palette-card-list" data-palette-list="category">${categories}</g><g class="palette-card-list" data-palette-list="preset">${presets}${empty}</g><g class="palette-card-pages">${pages}</g>${actions}</g></svg>`;
 }
 function listCardMarks(options, row) {
   const design = normalizeModDesign(options.design), styles = options.labelStyles || [], look = modLook(design);
@@ -14633,7 +14855,11 @@ function levelCardControls(model, layout) {
     press(`${control}-next`, control, layout[key].pageNext, { ...turn, step: 1 });
   }
   press("lvl-close", "lvl-close", layout.close);
-  return out;
+  const bottom = (control, prefix, page) => page.pages > 1 ? [`${control}-prev`, `${control}-next`] : page.shown.length ? [`${prefix}:${page.shown.at(-1).id}`] : [];
+  const worldBottom = bottom("lvl-world-page", "lvl-world", model.worlds), levelBottom = bottom("lvl-level-page", "lvl-level", model.levels);
+  const down2 = new Set([...worldBottom, ...levelBottom]), home = model.levels.shown.some((item) => item.id === model.current) ? `lvl-level:${model.current}` : null;
+  const up = home || levelBottom.at(-1) || worldBottom.at(-1) || null;
+  return out.map((control) => down2.has(control.id) ? { ...control, neighbours: { down: "lvl-close" } } : control.id === "lvl-close" && up ? { ...control, neighbours: { up } } : control);
 }
 function renderLevelCardSvg(model, layout, options = {}) {
   const unit = num(options.unit, REFERENCE_UNIT), W = LEVEL_CARD_WORDS, r = layout.rect, row = layout.row, kind = "level";
@@ -14648,7 +14874,7 @@ function renderLevelCardSvg(model, layout, options = {}) {
   const dividers = across3(r.y + row) + line(layout.split, r.y + row, layout.split, layout.bottomTop) + across3(layout.pagesTop) + across3(layout.bottomTop);
   const headings = say(W.world, layout.world.heading, "paramLabel", { anchor: "middle", kind: "paragraph" }) + say(W.level, layout.level.heading, "paramLabel", { anchor: "middle", kind: "paragraph" });
   const close = button(layout.close, controls.get("lvl-close"), W.close, { kind });
-  return `<svg class="mod-card level-card" id="layout2-level-card" viewBox="${round3(r.x)} ${round3(r.y)} ${round3(r.width)} ${round3(r.height)}" width="${round3(r.width)}" height="${round3(r.height)}"${options.attributes ? ` ${options.attributes}` : ""}><g style="${escOrBlank(options.roleStyle ? options.roleStyle(unit) : "")}">${body(r)}${dividers}${headings}<g class="level-card-list" data-level-list="world" role="listbox" aria-label="${escOrBlank(W.world)}">${worlds}</g><g class="level-card-list" data-level-list="level" role="listbox" aria-label="${escOrBlank(W.level)}">${levels}${empty}</g><g class="level-card-pages">${pages}</g>${close}</g></svg>`;
+  return `<svg class="mod-card level-card" id="layout2-level-card" viewBox="${round3(r.x)} ${round3(r.y)} ${round3(r.width)} ${round3(r.height)}" width="${round3(r.width)}" height="${round3(r.height)}"${options.attributes ? ` ${options.attributes}` : ""}>${roleRoot(options, unit)}${body(r)}${dividers}${headings}<g class="level-card-list" data-level-list="world" role="listbox" aria-label="${escOrBlank(W.world)}">${worlds}</g><g class="level-card-list" data-level-list="level" role="listbox" aria-label="${escOrBlank(W.level)}">${levels}${empty}</g><g class="level-card-pages">${pages}</g>${close}</g></svg>`;
 }
 var ANIMATION_CARD_WORDS = Object.freeze({ category: "Category", animation: "Animation" });
 function animationCardModel({ componentId = null, categories = [], category = null, chosen = null } = {}) {
@@ -14684,7 +14910,7 @@ function renderAnimationCardSvg(model, layout, options = {}) {
   const animations = model.items.map((item, index) => entry(layout.animation.rows[index], controls.get(`anim-kind:${item.id}`), item.name, item.id === model.chosen, { kind })).join("");
   const dividers = line(r.x, r.y + row, r.x + r.width, r.y + row) + line(layout.split, r.y + row, layout.split, r.y + r.height);
   const headings = say(W.category, layout.category.heading, "paramLabel", { anchor: "middle", kind: "paragraph" }) + say(W.animation, layout.animation.heading, "paramLabel", { anchor: "middle", kind: "paragraph" });
-  return `<svg class="mod-card animation-card" id="layout2-animation-card" viewBox="${round3(r.x)} ${round3(r.y)} ${round3(r.width)} ${round3(r.height)}" width="${round3(r.width)}" height="${round3(r.height)}"${options.attributes ? ` ${options.attributes}` : ""}><g style="${escOrBlank(options.roleStyle ? options.roleStyle(unit) : "")}">${body(r)}${dividers}${headings}<g class="animation-card-list" data-animation-list="category" role="listbox" aria-label="${escOrBlank(W.category)}">${categories}</g><g class="animation-card-list" data-animation-list="animation" role="listbox" aria-label="${escOrBlank(W.animation)}">${animations}</g></g></svg>`;
+  return `<svg class="mod-card animation-card" id="layout2-animation-card" viewBox="${round3(r.x)} ${round3(r.y)} ${round3(r.width)} ${round3(r.height)}" width="${round3(r.width)}" height="${round3(r.height)}"${options.attributes ? ` ${options.attributes}` : ""}>${roleRoot(options, unit)}${body(r)}${dividers}${headings}<g class="animation-card-list" data-animation-list="category" role="listbox" aria-label="${escOrBlank(W.category)}">${categories}</g><g class="animation-card-list" data-animation-list="animation" role="listbox" aria-label="${escOrBlank(W.animation)}">${animations}</g></g></svg>`;
 }
 var MORE_CARD_ROWS = 6;
 var MORE_CHOICE_MAX = 4;
@@ -14781,7 +15007,7 @@ function renderMoreSettingsCardSvg(model, layout, options = {}) {
   }).join("");
   const body = rect(r, "mod-card-body lm-role-surface", `${radius(r)}${look.paint("outline")}`);
   const divider = `<line class="lm-role-divider" x1="${round3(r.x)}" y1="${round3(r.y + row)}" x2="${round3(r.x + r.width)}" y2="${round3(r.y + row)}"${look.paint("outline")}/>`;
-  return `<svg class="mod-card more-card" id="layout2-more-card" viewBox="${round3(r.x)} ${round3(r.y)} ${round3(r.width)} ${round3(r.height)}" width="${round3(r.width)}" height="${round3(r.height)}"${options.attributes ? ` ${options.attributes}` : ""}><g style="${escOrBlank(options.roleStyle ? options.roleStyle(unit) : "")}">${body}${divider}<g class="more-card-heading">${heading}</g>${rows}</g></svg>`;
+  return `<svg class="mod-card more-card" id="layout2-more-card" viewBox="${round3(r.x)} ${round3(r.y)} ${round3(r.width)} ${round3(r.height)}" width="${round3(r.width)}" height="${round3(r.height)}"${options.attributes ? ` ${options.attributes}` : ""}>${roleRoot(options, unit)}${body}${divider}<g class="more-card-heading">${heading}</g>${rows}</g></svg>`;
 }
 function infoCardSize(rect2, { labelSize = 14, scale = 1, styles = [] } = {}) {
   const row = num(labelSize, 14) * MOD_ROW_HEIGHT, pad2 = row * INFO_PAD, size = num(textStyleOf(styles, "paragraph").fontSize, 12);
@@ -14850,22 +15076,18 @@ function renderInfoCardSvg(model, layout, options = {}) {
   const lines = list(model.lines).map((item, index) => layout.lines[index] ? say(item.words, layout.lines[index], "notes", { tier: "helper", kind: "paragraph" }) : "").join("");
   const body = rect(r, "mod-card-body lm-role-surface", `${cornerRx(options.radius, r)}${look.paint("outline")}`);
   const divider = `<line class="lm-role-divider" x1="${round3(r.x)}" y1="${round3(r.y + row)}" x2="${round3(r.x + r.width)}" y2="${round3(r.y + row)}"${look.paint("outline")}/>`;
-  return `<svg class="mod-card info-card" id="layout2-info-card" viewBox="${round3(r.x)} ${round3(r.y)} ${round3(r.width)} ${round3(r.height)}" width="${round3(r.width)}" height="${round3(r.height)}"${options.attributes ? ` ${options.attributes}` : ""}><g style="${escOrBlank(options.roleStyle ? options.roleStyle(unit) : "")}">${body}${divider}<g class="info-card-heading">${heading}</g><g class="info-card-text">${lines}</g></g></svg>`;
+  return `<svg class="mod-card info-card" id="layout2-info-card" viewBox="${round3(r.x)} ${round3(r.y)} ${round3(r.width)} ${round3(r.height)}" width="${round3(r.width)}" height="${round3(r.height)}"${options.attributes ? ` ${options.attributes}` : ""}>${roleRoot(options, unit)}${body}${divider}<g class="info-card-heading">${heading}</g><g class="info-card-text">${lines}</g></g></svg>`;
 }
 var HELP_ACTION = "help.toggle";
 var HELP_CARD_WORDS = Object.freeze({
   title: "Help",
   controls: "Controls",
   tips: "Tips",
-  close: "Close",
-  showHint: "Show the help hint at start",
-  hideHint: "Don't show again"
+  close: "Close"
 });
-var helpHintWords = (key = "I") => `Help and tips: press the "${key}" key`;
-var HELP_HINT_SECONDS = 4;
 var HELP_CARD_WIDTH = 0.8;
 var HELP_ROWS = { heading: 1, action: 0.78, line: 0.78, gap: 0.4 };
-function helpCardModel({ actions = [], keymap = {}, rules = {}, inputName = String, hintShown = true } = {}) {
+function helpCardModel({ actions = [], keymap = {}, rules = {}, inputName = String } = {}) {
   const keysOf = (id) => list(keymap?.[id]).map((code) => inputName(code)).filter(Boolean);
   const named = (id, fallback) => keysOf(id).join(" / ") || fallback;
   const groups = [];
@@ -14887,7 +15109,7 @@ function helpCardModel({ actions = [], keymap = {}, rules = {}, inputName = Stri
     `${named("panic", "Esc")} backs out of whatever is open.`,
     ...(rules?.musicalKeyboardPolicy || "caps-lock") === "caps-lock" ? ["With Caps Lock on, the letter keys play notes."] : []
   ];
-  return { groups, tips, hintShown: Boolean(hintShown) };
+  return { groups, tips };
 }
 function wrapWords(words, fits) {
   const lines = [];
@@ -14907,7 +15129,7 @@ function helpCardSize(model, sheet, { labelSize = 14, scale = 1 } = {}) {
   const fullText = full.row / MOD_ROW_HEIGHT, column = width / 2 - 2 * full.row * 0.44;
   const tipLines = list(model?.tips).map((tip) => wrapWords(tip, Math.max(8, Math.floor(column / (fullText * TEXT_CHAR_WIDTH)))));
   const tipRows = HELP_ROWS.heading + tipLines.reduce((sum, lines) => sum + lines.length * HELP_ROWS.line + HELP_ROWS.gap, 0);
-  const size = cardSizeOf(1 + Math.max(helpControlRows(model), tipRows) + 1, sheet, sizing);
+  const size = cardSizeOf(1 + Math.max(helpControlRows(model), tipRows), sheet, sizing);
   return { ...size, width, tipLines };
 }
 function helpCardPlacement(sheet, size) {
@@ -14915,7 +15137,7 @@ function helpCardPlacement(sheet, size) {
   return box((W - size.width) / 2, Math.max(num(size.margin, 0), (H - size.height) / 2), size.width, size.height);
 }
 function helpCardLayout(model, rect2, size) {
-  const row = size.row, pad2 = row * 0.44, split = rect2.x + rect2.width / 2, top = rect2.y + row, bottom = rect2.y + rect2.height - row;
+  const row = size.row, pad2 = row * 0.44, split = rect2.x + rect2.width / 2, top = rect2.y + row;
   const left = { x: rect2.x + pad2, width: split - rect2.x - 2 * pad2 }, right = { x: split + pad2, width: rect2.x + rect2.width - split - 2 * pad2 };
   let y = top;
   const groups = list(model?.groups).map((group) => {
@@ -14940,7 +15162,6 @@ function helpCardLayout(model, rect2, size) {
     ty += row * HELP_ROWS.gap;
     return boxes2;
   });
-  const side = row * 0.5, check = box(rect2.x + pad2, bottom + (row - side) / 2, side, side);
   const closeWidth = Math.min(right.width, row * 4);
   return {
     rect: rect2,
@@ -14948,21 +15169,13 @@ function helpCardLayout(model, rect2, size) {
     split,
     title: box(rect2.x + pad2, rect2.y, rect2.width - 2 * pad2 - closeWidth, row),
     close: box(rect2.x + rect2.width - pad2 - closeWidth, rect2.y + row * 0.1, closeWidth, row * 0.8),
-    hint: { box: box(rect2.x + pad2, bottom, left.width + pad2, row), check, words: box(check.x + side * 1.6, bottom, left.width - side * 1.6, row) },
     headings: { tips: tipsHeading },
     groups,
     tips,
     tipLines: list(size.tipLines)
   };
 }
-function helpCardControls(model, layout) {
-  const press = (id, b) => ({ id, control: id, action: "press", box: b, point: centre2(b) });
-  return [press("help-close", layout.close), press("help-hint-show", layout.hint.box)];
-}
-var checkMark = (b, checked, radius) => {
-  const inner = box(b.x + b.width * 0.22, b.y + b.height * 0.22, b.width * 0.56, b.height * 0.56);
-  return `${rect(b, "lm-role-divider", cornerRx(radius * 0.3, b))}${checked ? rect(inner, "lm-role-value", cornerRx(radius * 0.2, inner)) : ""}`;
-};
+var helpCardControls = (model, layout) => [{ id: "help-close", control: "help-close", action: "press", box: layout.close, point: centre2(layout.close) }];
 function renderHelpCardSvg(model, layout, options = {}) {
   const design = normalizeModDesign(options.design), styles = options.labelStyles || [], unit = num(options.unit, REFERENCE_UNIT), W = HELP_CARD_WORDS;
   const look = modLook(design), r = layout.rect, row = layout.row;
@@ -14973,8 +15186,7 @@ function renderHelpCardSvg(model, layout, options = {}) {
   const controls = new Map(helpCardControls(model, layout).map((control) => [control.id, control]));
   const line = (x1, y1, x2, y2) => `<line class="lm-role-divider" x1="${round3(x1)}" y1="${round3(y1)}" x2="${round3(x2)}" y2="${round3(y2)}"${look.paint("outline")}/>`;
   const body = rect(r, "mod-card-body lm-role-surface", `${cornerRx(options.radius, r)}${look.paint("outline")}`);
-  const bottom = r.y + r.height - row;
-  const dividers = line(r.x, r.y + row, r.x + r.width, r.y + row) + line(layout.split, r.y + row, layout.split, bottom) + line(r.x, bottom, r.x + r.width, bottom);
+  const dividers = line(r.x, r.y + row, r.x + r.width, r.y + row) + line(layout.split, r.y + row, layout.split, r.y + r.height);
   const title = say(W.title, layout.title, "paramLabel", { kind: "paragraph" });
   const c = layout.close, closeFrame = box(c.x + c.width * 0.04, c.y + c.height * 0.1, c.width * 0.92, c.height * 0.8);
   const close = `<g class="mod-control help-card-button" ${controlAttributes(controls.get("help-close"))} role="button" aria-label="${escOrBlank(W.close)}">${hit(c)}${rect(closeFrame, "lm-role-divider lm-dashed", `${cornerRx(options.radius, closeFrame)}${look.paint("frames")}`)}${say(W.close, c, "buttonText", { anchor: "middle" })}</g>`;
@@ -14983,38 +15195,740 @@ function renderHelpCardSvg(model, layout, options = {}) {
     return `<g class="help-card-group">${say(group.group, place.heading, "paramLabel", { kind: "paragraph" })}${group.rows.map((item, i) => say(item.name, place.rows[i].name, "names", { tier: "label" }) + say(item.keys, place.rows[i].keys, "names", { tier: "value" })).join("")}</g>`;
   }).join("");
   const tips = say(W.tips, layout.headings.tips, "paramLabel", { kind: "paragraph" }) + list(layout.tips).map((boxes2, t) => boxes2.map((b, i) => say(list(layout.tipLines[t])[i] ?? "", b, "notes", { tier: "helper", kind: "paragraph" })).join("")).join("");
-  const hint = `<g class="mod-control help-card-check" ${controlAttributes(controls.get("help-hint-show"))} role="checkbox" aria-checked="${model.hintShown}" aria-label="${escOrBlank(W.showHint)}">${hit(layout.hint.box)}${checkMark(layout.hint.check, model.hintShown, num(options.radius, 0))}${say(W.showHint, layout.hint.words, "names", { tier: "label", kind: "paragraph" })}</g>`;
-  return `<svg class="mod-card help-card" id="layout2-help-card" viewBox="${round3(r.x)} ${round3(r.y)} ${round3(r.width)} ${round3(r.height)}" width="${round3(r.width)}" height="${round3(r.height)}"${options.attributes ? ` ${options.attributes}` : ""}><g style="${escOrBlank(options.roleStyle ? options.roleStyle(unit) : "")}">${body}${dividers}${title}${close}${groups}${tips}${hint}</g></svg>`;
+  return `<svg class="mod-card help-card" id="layout2-help-card" viewBox="${round3(r.x)} ${round3(r.y)} ${round3(r.width)} ${round3(r.height)}" width="${round3(r.width)}" height="${round3(r.height)}"${options.attributes ? ` ${options.attributes}` : ""}>${roleRoot(options, unit)}${body}${dividers}${title}${close}${groups}${tips}</g></svg>`;
 }
-function helpHintSize(words, sheet, { labelSize = 14, scale = 1 } = {}) {
-  const size = cardSizeOf(2, sheet, { labelSize: num(labelSize, 14), scale }), textSize = size.row / MOD_ROW_HEIGHT;
-  const longest = Math.max(String(words ?? "").length, HELP_CARD_WORDS.hideHint.length + 3);
-  return { ...size, width: Math.min(num(sheet.width) - 2 * size.margin, longest * textSize * TEXT_CHAR_WIDTH + 2 * size.row * 0.6) };
+
+// library/ui/action.js
+var ONE_DOT = Object.freeze({ adjust: "one", press: "none", pressOnGrab: false });
+var PER_REGION = Object.freeze({ adjust: "per-region", press: "none", pressOnGrab: false });
+var NONE = Object.freeze({ adjust: "none", press: "none", pressOnGrab: false });
+var ACTION_KINDS = Object.freeze({
+  pad: ONE_DOT,
+  noisePad: ONE_DOT,
+  portamentoPad: ONE_DOT,
+  pitchShiftPad: ONE_DOT,
+  adsrPad: PER_REGION,
+  filterPads: PER_REGION,
+  delayQuadPad: PER_REGION,
+  roomReverbPad: PER_REGION,
+  warpChorusPad: PER_REGION,
+  lfoPad: PER_REGION,
+  distortionPad: PER_REGION,
+  glideShiftPad: PER_REGION,
+  pabfoPad: PER_REGION,
+  panPad: PER_REGION,
+  duckPad: PER_REGION,
+  randomPad: PER_REGION,
+  scope: PER_REGION,
+  stepSequencer: { adjust: "per-region", press: "cells", pressOnGrab: false },
+  ravaStepSequencer: { adjust: "per-region", press: "cells", pressOnGrab: false },
+  pageSwitcher: { adjust: "none", press: "pages", pressOnGrab: false },
+  palettePicker: { adjust: "none", press: "buttons", pressOnGrab: false },
+  patchPicker: { adjust: "none", press: "buttons", pressOnGrab: false },
+  diagramButton: { adjust: "none", press: "buttons", pressOnGrab: false },
+  handbookButton: { adjust: "none", press: "buttons", pressOnGrab: false },
+  levelSwitcher: { adjust: "none", press: "buttons", pressOnGrab: false },
+  levelStep: { adjust: "none", press: "buttons", pressOnGrab: false },
+  hexKeyboard: { adjust: "none", press: "buttons", pressOnGrab: false },
+  ravaFlowerKeyboard: { adjust: "none", press: "buttons", pressOnGrab: false },
+  ravaHoldButton: { adjust: "none", press: "buttons", pressOnGrab: false },
+  windowButton: { adjust: "none", press: "buttons", pressOnGrab: false },
+  navSettings: { adjust: "per-region", press: "buttons", pressOnGrab: false },
+  backgroundAnimation: { adjust: "per-region", press: "buttons", pressOnGrab: false },
+  ...Object.fromEntries(Object.keys(COMPONENT_CONTROLS).map((kind) => [kind, Object.freeze({ adjust: "per-region", press: "buttons", pressOnGrab: false })])),
+  modStack: { adjust: "per-region", press: "buttons", pressOnGrab: false },
+  midiAssign: { adjust: "none", press: "buttons", pressOnGrab: false },
+  rotaryPad: { adjust: "per-region", press: "buttons", pressOnGrab: false },
+  chorusPad: { adjust: "per-region", press: "buttons", pressOnGrab: false },
+  recorder: { adjust: "one", press: "strip", pressOnGrab: false },
+  paxDisplay: NONE,
+  ravaScope: NONE,
+  scopeTrace: NONE,
+  waterfall: NONE,
+  tuner: NONE,
+  levelText: NONE,
+  label: NONE,
+  other: NONE
+});
+var rects = new WeakMap;
+var rectsFrame = 0;
+function measure(element) {
+  const raf = globalThis.requestAnimationFrame;
+  if (typeof raf !== "function")
+    return element.getBoundingClientRect();
+  const kept = rects.get(element);
+  if (kept)
+    return kept;
+  const rect2 = element.getBoundingClientRect();
+  rects.set(element, rect2);
+  if (!rectsFrame)
+    rectsFrame = raf(() => {
+      rectsFrame = 0;
+      rects = new WeakMap;
+    });
+  return rect2;
 }
-function helpHintPlacement(sheet, size, switcher = null, { top = 0 } = {}) {
-  const W = num(sheet.width), H = num(sheet.height), m = num(size.margin, 0), gap = num(size.row, 20) * 0.5;
-  if (!switcher)
-    return box((W - size.width) / 2, H - m - size.height, size.width, size.height);
-  const x = clamp(switcher.x + switcher.width / 2 - size.width / 2, m, Math.max(m, W - m - size.width));
-  const above = switcher.y - gap - size.height;
-  return box(x, above >= num(top, 0) ? above : switcher.y + switcher.height + gap, size.width, size.height);
+function hostScale(host) {
+  const rect2 = measure(host.element);
+  return rect2.width / Math.max(1, host.sheet.width);
 }
-function helpHintLayout(rect2, size) {
-  const row = size.row, pad2 = row * 0.6, side = row * 0.5, second = rect2.y + row;
-  const check = box(rect2.x + pad2, second + (row - side) / 2 - row * 0.1, side, side);
-  return { rect: rect2, row, words: box(rect2.x + pad2, rect2.y + row * 0.1, rect2.width - 2 * pad2, row), hide: { box: box(rect2.x + pad2 * 0.5, second - row * 0.1, rect2.width - pad2, row), check, words: box(check.x + side * 1.6, second - row * 0.1, rect2.width - 2 * pad2 - side * 1.6, row) } };
+var hostToClient = (host, point) => {
+  const rect2 = measure(host.element), scale = hostScale(host);
+  return { x: rect2.left + point.x * scale, y: rect2.top + point.y * scale };
+};
+var clientToHost = (host, x, y) => {
+  const rect2 = measure(host.element), scale = hostScale(host);
+  return { x: (x - rect2.left) / scale, y: (y - rect2.top) / scale };
+};
+var rectToClient = (host, rect2) => {
+  const a = hostToClient(host, { x: rect2.left, y: rect2.top }), b = hostToClient(host, { x: rect2.right, y: rect2.bottom });
+  return { left: a.x, top: a.y, right: b.x, bottom: b.y };
+};
+var boxRect = (box2) => ({ left: box2.x, top: box2.y, right: box2.x + box2.width, bottom: box2.y + box2.height });
+function targetEntry(sheet, target) {
+  const cell = [...sheet.cells, ...sheet.frameCells || []].find((entry) => entry.id === target?.cellId), component = cell?.components.find((entry) => entry.id === target.componentId);
+  const geometry = component && cellGeometryOf(sheet, cell, layout2CellGeometry);
+  return geometry ? { cell, component, geometry } : null;
 }
-var helpHintControls = (layout) => [{ id: "help-hint-hide", control: "help-hint-hide", action: "press", box: layout.hide.box, point: centre2(layout.hide.box) }];
-function renderHelpHintSvg(words, layout, options = {}) {
-  const design = normalizeModDesign(options.design), styles = options.labelStyles || [], unit = num(options.unit, REFERENCE_UNIT);
-  const look = modLook(design), r = layout.rect, [control] = helpHintControls(layout);
-  const say = (value, b, id, { kind, ...extra } = {}) => {
-    const w = look.words(id, kind);
-    return text(value, b, styles, w.kind, { tier: w.tier, ...extra });
+function gestureAnchor(component, geometry, part) {
+  const known = component.gesture === "point" || isMotionRecorder(component);
+  return known ? indicatorPoint2(component, geometry, part) : componentMapPoint(component, geometry, clamp(num(component.valueNormalized, 0.5), 0, 1), 0.5);
+}
+var HELD_REGIONS = Object.freeze({
+  adsrPad: { key: "adsrHeld", model: "adsrPad" },
+  filterPads: { key: "filterHeld", model: "filterPads" },
+  delayQuadPad: { key: "delayHeld", model: "delayQuadPad" },
+  roomReverbPad: { key: "roomHeld", model: "roomReverbPad" },
+  warpChorusPad: { key: "warpHeld", model: "warpChorusPad" },
+  rotaryPad: { key: "rotaryHeld", model: "rotaryPad" },
+  lfoPad: { key: "lfoHeld", model: "lfoPad" },
+  distortionPad: { key: "distortionHeld", model: "distortionPad" },
+  glideShiftPad: { key: "glideShiftHeld", model: "glideShiftPad" },
+  chorusPad: { key: "chorusHeld", model: "chorusPad" },
+  pabfoPad: { key: "pabfoHeld", model: "pabfoPad" },
+  panPad: { key: "panHeld", model: "panPad" },
+  duckPad: { key: "duckHeld", model: "duckPad" },
+  randomPad: { key: "randomHeld", model: "randomPad" },
+  stepSequencer: { key: "seqHeld", model: "stepSequencer" },
+  ravaStepSequencer: { key: "seqHeld", model: "ravaStepSequencer" },
+  navSettings: { key: "navHeld", model: "navSettings" },
+  backgroundAnimation: { key: "backgroundHeld", model: "backgroundAnimation" },
+  ...Object.fromEntries(Object.keys(COMPONENT_CONTROLS).map((kind) => [kind, { key: `${kind}Held`, model: kind }])),
+  modStack: { key: "stackHeld", model: "modStack" },
+  scope: { key: "scopeHeld", model: "scope" }
+});
+function setComponentAt(cell, component, geometry, point, { begin = false, part = null, press = false } = {}) {
+  const local = componentUnmapPoint(component, geometry, point);
+  const regionKey = componentType(component).regionKey, held = part && regionKey ? { [regionKey]: part } : {};
+  if (component.gesture === "point")
+    setComponentGesture(cell, component, { x: local.x, y: local.y, begin, press, ...held });
+  else
+    setComponentGesture(cell, component, { value: local.x, x: local.x, y: local.y });
+  const holding = HELD_REGIONS[componentKind(component)];
+  return holding ? { key: holding.key, value: { componentId: component.id, [regionKey]: component[holding.model].active } } : null;
+}
+function pageTargetElement(sheetElement, target) {
+  if (target.action === "view")
+    return null;
+  const id = cssEscape(target.componentId);
+  if (target.action === "press") {
+    const component = sheetElement.querySelector(`.layout2-component[data-product-component-id="${id}"]`);
+    if (!component)
+      return null;
+    if (target.part === "play")
+      return component.querySelector(".motion-play");
+    const part = cssEscape(String(target.part));
+    return component.querySelector(`[data-seq-press="${part}"], [data-page-press="${part}"], [data-panel-press="${part}"], [data-rotary-press="${part}"], [data-chorus-press="${part}"], [data-hex-press="${part}"]`);
+  }
+  const layer = sheetElement.querySelector(`[data-live-component-id="${id}"]`);
+  if (!layer)
+    return null;
+  if (!target.part)
+    return layer.querySelector(".component-live");
+  return layer.querySelector(`.component-live[data-region="${cssEscape(target.part)}"]`);
+}
+var pageTarget = (host, target) => ({ ...target, kind: "page", id: `page:${target.componentId}:${target.part}`, point: hostToClient(host, target.point), anchor: target.anchor && hostToClient(host, target.anchor), neighbours: target.neighbours && Object.fromEntries(Object.entries(target.neighbours).map(([direction, part]) => [direction, `page:${target.componentId}:${part}`])), rect: target.rect && rectToClient(host, target.rect), outline: target.outline && target.outline.map((point) => hostToClient(host, point)), element: pageTargetElement(host.sheetElement, target) });
+var BUTTON_SELECTOR = "[data-label-action]";
+var buttonTarget = (element) => {
+  const box2 = measure(element), rect2 = { left: box2.left, top: box2.top, right: box2.right, bottom: box2.bottom };
+  return { kind: "button", id: `button:${element.dataset.buttonLabelId}`, labelId: element.dataset.buttonLabelId, labelAction: element.dataset.labelAction, action: "press", point: { x: (rect2.left + rect2.right) / 2, y: (rect2.top + rect2.bottom) / 2 }, rect: rect2, element };
+};
+var buttonTargets = (host) => (host?.kind === "page" || host?.kind === "mod") && !host.card && host.sheetElement ? [...host.sheetElement.querySelectorAll(BUTTON_SELECTOR)].filter((element) => !cellVeiled(element.dataset.cellId)).map(buttonTarget) : [];
+var buttonFrame = (element) => (element.querySelector?.(".layout2-mod-button-frame")?.getAttribute("d")?.match(/-?[\d.]+,-?[\d.]+/g) || []).map((pair2) => {
+  const [x, y] = pair2.split(",").map(Number);
+  return { x, y };
+});
+function componentAtPoint(sheet, point) {
+  for (const cell of [...sheet?.cells || [], ...sheet?.frameCells || []]) {
+    const geometry = cell.components?.length && cellGeometryOf(sheet, cell, layout2CellGeometry);
+    const component = geometry && cell.components.find((item) => pointInPolygon(point, componentOutline(item, geometry)));
+    if (component)
+      return { cell, component, geometry };
+  }
+  return null;
+}
+var pointOnComponent = (sheet, point) => Boolean(componentAtPoint(sheet, point));
+function buttonTargetAt(host, point) {
+  if (!point || pointOnComponent(host?.sheet, point))
+    return null;
+  return buttonTargets(host).find((target) => {
+    const frame = buttonFrame(target.element);
+    return frame.length > 2 && pointInPolygon(point, frame);
+  }) || null;
+}
+var buttonInCell = (host, target) => {
+  const point = clientToHost(host, target.point.x, target.point.y), cell = frameCellAtPoint(host.sheet, point) || layout2CellAtPoint(host.sheet, point);
+  return cell ? { ...target, cellId: cell.id } : target;
+};
+function stepCells(host) {
+  const sheet = host?.sheet;
+  if (!sheet?.cells || !host.element)
+    return [];
+  const { nodes } = buildLayout2Graph(sheet), client = (point) => hostToClient(host, point);
+  const loop = (ids) => (ids || []).map((id) => nodes.get(id)).filter(Boolean).map(client);
+  return [
+    ...sheet.cells.map((cell) => ({ id: cell.id, loop: loop(cell.nodeIds), holes: (cell.holeNodeIds || []).map(loop).filter((hole) => hole.length > 2) })),
+    ...(sheet.frameCells || []).map((cell) => ({ id: cell.id, loop: (cell.geometry?.points || cell.geometry?.outline || []).map(client), holes: [] }))
+  ].filter((cell) => cell.loop.length > 2);
+}
+function componentTargets3(sheet, keep = () => true) {
+  const seen = new Set;
+  return controlTargets(sheet).filter((target) => {
+    if (seen.has(target.componentId) || !keep(target.componentId))
+      return false;
+    seen.add(target.componentId);
+    return true;
+  });
+}
+var pickTargets = (host) => componentTargets3(host.sheet, (id) => host.eligible.has(id));
+var pickTarget = (host, target) => ({ ...pageTarget(host, target), kind: "pick", id: `pick:${target.componentId}`, action: "press" });
+var pickPageTargets = (host) => host.pages ? controlTargets(host.sheet).filter((target) => {
+  const entry = targetEntry(host.sheet, target);
+  return entry && isPageSwitcher(entry.component);
+}) : [];
+function pickTargetAt(host, point) {
+  const target = controlTargetAt(host.sheet, point, null);
+  return target && host.eligible.has(target.componentId) ? pickTargets(host).find((item) => item.componentId === target.componentId) || null : null;
+}
+var targetHandleKey = (target) => handleKey(target.componentId, target.part);
+var kfoHostTargets = (host) => controlTargets(host.sheet).filter((target) => target.action === "adjust" && host.eligible.has(targetHandleKey(target)));
+var kfoTarget = (host, target) => ({ ...pageTarget(host, target), kind: "kfo", id: `kfo:${targetHandleKey(target)}`, key: targetHandleKey(target), action: "press" });
+function kfoTargetAt(host, point, previous = null) {
+  const found = controlTargetAt(host.sheet, point, previous);
+  if (!found)
+    return null;
+  const key = targetHandleKey(found);
+  return kfoHostTargets(host).find((target) => targetHandleKey(target) === key) || null;
+}
+function modControlElements(element, control, { all = false } = {}) {
+  if (!all)
+    return [...element.querySelectorAll(`[data-mod-id="${cssEscape(control.id)}"]`)];
+  const by = control.control === "route-level" ? `[data-mod-control="route-level"][data-mod-route="${cssEscape(control.routeId)}"]` : `[data-mod-control="${cssEscape(control.control)}"][data-mod-param="${cssEscape(control.param)}"]`;
+  const found = [...element.querySelectorAll(by)];
+  return found.length ? found : [...element.querySelectorAll(`[data-mod-id="${cssEscape(control.id)}"]`)];
+}
+function modControlElement(element, control) {
+  const found = modControlElements(element, control)[0] || null;
+  return control.action === "adjust" ? found?.querySelector(".mod-level-dot") || found : found;
+}
+var modTarget = (host, control) => ({ ...control, kind: "mod", id: `mod:${control.id}`, group: "mod-card", neighbours: control.neighbours && Object.fromEntries(Object.entries(control.neighbours).map(([direction, id]) => [direction, `mod:${id}`])), point: hostToClient(host, control.point), rect: rectToClient(host, boxRect(control.box)), element: modControlElement(host.element, control) });
+function paintModLevel(control, value) {
+  const [x, y, width, height] = control.dataset.modLevelBox.split(",").map(Number), range = control.dataset.modLevelRange || "bipolar";
+  const at = modSliderPoint({ x, y, width, height }, control.dataset.modLevelAxis, value, range), fill = control.querySelector(".mod-level-fill");
+  fill?.setAttribute("x2", at.x);
+  fill?.setAttribute("y2", at.y);
+  control.querySelector(".mod-level-indicator")?.setAttribute("transform", `translate(${at.x} ${at.y})`);
+  control.setAttribute("aria-valuenow", Math.round(value * 100));
+  const readout = control.querySelector("[data-mod-percent] tspan");
+  if (readout)
+    readout.textContent = modReadout(value, range, control.dataset.modFormat || "");
+}
+function indicatorLookVariables(indicator = {}) {
+  return {
+    "--nav-indicator-diameter": `${2 * clamp(num(indicator.size, 5), 1, 20)}px`,
+    "--nav-indicator-stroke": `${clamp(num(indicator.strokeWidth, 1), 0, 6)}px`
   };
-  const body = rect(r, "mod-card-body lm-role-surface", `${cornerRx(options.radius, r)}${look.paint("outline")}`);
-  const hide = `<g class="mod-control help-hint-check" ${controlAttributes(control)} role="checkbox" aria-checked="false" aria-label="${escOrBlank(HELP_CARD_WORDS.hideHint)}">${hit(layout.hide.box)}${checkMark(layout.hide.check, false, num(options.radius, 0))}${say(HELP_CARD_WORDS.hideHint, layout.hide.words, "names", { tier: "helper", kind: "paragraph" })}</g>`;
-  return `<svg class="mod-card help-hint" id="layout2-help-hint" viewBox="${round3(r.x)} ${round3(r.y)} ${round3(r.width)} ${round3(r.height)}" width="${round3(r.width)}" height="${round3(r.height)}"${options.attributes ? ` ${options.attributes}` : ""}><g style="${escOrBlank(options.roleStyle ? options.roleStyle(unit) : "")}">${body}${say(words, layout.words, "paramLabel", { anchor: "middle", tier: "label", kind: "paragraph" })}${hide}</g></svg>`;
+}
+function actionHandoffOptions({ host: currentHost = () => null, hooks = {} } = {}) {
+  const call = (name, ...args) => typeof hooks[name] === "function" ? hooks[name](...args) : undefined;
+  const recorder = hooks.recorder || {}, mod = hooks.mod || {};
+  const own = (target) => String(target.id).slice(String(target.id).indexOf(":") + 1);
+  const pageHost = (host, target) => target?.band && host?.bands?.find((band2) => band2.id === target.band) || host;
+  const bandTarget = (band2, target) => ({ ...pageTarget(band2, target), band: band2.id, id: `page:${band2.id}:${target.componentId}:${target.part}` });
+  let previous = null, held = null;
+  let gripPress = null;
+  function gripDragAt(drag, target, at) {
+    const host = currentHost();
+    if (!drag || !at || drag.target.id !== target?.id || !host?.sheet)
+      return null;
+    const entry = targetEntry(host.sheet, drag.target);
+    return entry ? { entry, local: componentUnmapPoint(entry.component, entry.geometry, clientToHost(host, at.x, at.y)) } : null;
+  }
+  function showPaletteDropTarget(target) {
+    const host = currentHost();
+    if (gripPress || !host?.sheet)
+      return;
+    let changed = false;
+    for (const cell of host.sheet.cells || [])
+      for (const component of cell.components || []) {
+        if (!isPalettePicker(component) || !component.palettePicker?.lifted)
+          continue;
+        const part = target?.kind === "page" && target.componentId === component.id ? parsePaletteGroupPart(target.part) : null;
+        changed = setPalettePickerOver(component, part && (part.kind === "swatch" || part.kind === "grip") ? part.group : null) || changed;
+      }
+    if (changed)
+      call("render");
+  }
+  const commit = () => {
+    call("persist");
+    call("render");
+  };
+  let heldNote = null;
+  const releaseNote = () => {
+    if (heldNote === null)
+      return;
+    const note = heldNote;
+    heldNote = null;
+    call("noteOff", note);
+  };
+  let windowOn = false;
+  const releaseWindow = () => {
+    if (!windowOn)
+      return;
+    windowOn = false;
+    call("windowHold", false);
+    call("render");
+  };
+  function pressPage(host, target) {
+    const entry = targetEntry(host.sheet, target);
+    if (!entry)
+      return;
+    if (isStepSequencer(entry.component)) {
+      call("touch", entry, { recorder: false });
+      const result = pressStepKeyboard(entry.component, target.part);
+      if (result.note !== null) {
+        releaseNote();
+        heldNote = result.note;
+        call("noteOn", result.note, HEX_KEY_VELOCITY);
+      }
+      if (result.changed)
+        commit();
+      return;
+    }
+    if (isRavaStepSequencer(entry.component)) {
+      call("touch", entry, { recorder: false });
+      if (pressRavaStepSequencer(entry.component, target.part))
+        commit();
+      return;
+    }
+    if (isPageSwitcher(entry.component)) {
+      call("touch", entry, { recorder: false });
+      if (isConnectPart(target.part))
+        call("connect");
+      else if (target.part != null)
+        call("page", String(target.part), entry.component);
+      return;
+    }
+    if (isPalettePicker(entry.component)) {
+      call("touch", entry, { recorder: false });
+      const result = pressPalettePicker(entry.component, target.part), grip = parsePaletteGroupPart(target.part);
+      gripPress = grip?.kind === "grip" && entry.component.palettePicker?.lifted === grip.group ? { target, group: grip.group } : null;
+      if (result.palette)
+        call("palette");
+      commit();
+      if (result.edit !== null)
+        call("editSwatch", result.edit);
+      if (result.name)
+        call("namePalette", result.name, entry.component.id);
+      if (result.field)
+        call("editPaletteField", result.field, entry.component.id);
+      if (result.manage)
+        call("managePalettePresets", entry.component.id);
+      return;
+    }
+    if (isPatchPicker(entry.component)) {
+      call("touch", entry, { recorder: false });
+      const result = pressPatchPicker(entry.component, target.part);
+      if (result.patch)
+        call("patch");
+      commit();
+      if (result.name)
+        call("namePatch", result.name, entry.component.id);
+      if (result.manage)
+        call("managePatchPresets", entry.component.id);
+      return;
+    }
+    if (isHexKeyboard(entry.component)) {
+      call("touch", entry, { recorder: false });
+      const result = pressHexKeyboard(hexKeyboardSequencer(entry.component), target.part);
+      if (result.note !== null) {
+        releaseNote();
+        heldNote = result.note;
+        call("noteOn", result.note, HEX_KEY_VELOCITY);
+      }
+      if (result.changed)
+        commit();
+      return;
+    }
+    if (isRavaFlowerKeyboard(entry.component)) {
+      call("touch", entry, { recorder: false });
+      const note = pressRavaFlowerKeyboard(target.part);
+      if (note !== null) {
+        releaseNote();
+        heldNote = note;
+        call("noteOn", note, RAVA_FLOWER_VELOCITY);
+      }
+      return;
+    }
+    if (isRavaHoldButton(entry.component)) {
+      call("touch", entry, { recorder: false });
+      if (pressRavaHoldButton(target.part).hold) {
+        call("holdNote", RAVA_HOLD_NOTE);
+        call("render");
+      }
+      return;
+    }
+    if (isWindowButton(entry.component)) {
+      call("touch", entry, { recorder: false });
+      if (pressWindowButton(target.part).hold) {
+        windowOn = true;
+        call("windowHold", true);
+        call("render");
+      }
+      return;
+    }
+    if (isDiagramButton(entry.component)) {
+      call("touch", entry, { recorder: false });
+      if (pressDiagramButton(entry.component, target.part).open)
+        call("diagram", entry.component.id);
+      return;
+    }
+    if (isHandbookButton(entry.component)) {
+      call("touch", entry, { recorder: false });
+      if (pressHandbookButton(entry.component, target.part).open)
+        call("handbook", entry.component.id);
+      return;
+    }
+    if (isLevelSwitcher(entry.component)) {
+      call("touch", entry, { recorder: false });
+      if (pressLevelSwitcher(entry.component, target.part).list)
+        call("levelList", entry.component.id);
+      return;
+    }
+    if (isLevelStep(entry.component)) {
+      call("touch", entry, { recorder: false });
+      const result = pressLevelStep(entry.component, target.part);
+      if (result.back)
+        call("levelBack");
+      if (result.next)
+        call("levelNext");
+      return;
+    }
+    if (isNavSettings(entry.component)) {
+      call("touch", entry, { recorder: false });
+      if (pressNavSettings(entry.component, target.part))
+        commit();
+      return;
+    }
+    if (isBackgroundAnimation(entry.component)) {
+      call("touch", entry, { recorder: false });
+      const result = pressBackgroundAnimation(entry.component, target.part);
+      if (result.changed)
+        commit();
+      if (result.list)
+        call("manageAnimations", entry.component.id);
+      return;
+    }
+    const controls = componentControls(entry.component);
+    if (controls) {
+      call("touch", entry, { recorder: false });
+      if (controls.press(entry.component, target.part))
+        commit();
+      return;
+    }
+    if (isRotaryPad(entry.component)) {
+      call("touch", entry, { recorder: false });
+      if (pressRotaryPad(entry.component, target.part))
+        commit();
+      return;
+    }
+    if (isChorusPad(entry.component)) {
+      call("touch", entry, { recorder: false });
+      if (pressChorusPad(entry.component, target.part))
+        commit();
+      return;
+    }
+    if (isModStack(entry.component)) {
+      call("touch", entry, { recorder: false });
+      if (pressModStack(entry.component, target.part))
+        commit();
+      return;
+    }
+    if (isMidiAssign(entry.component)) {
+      call("touch", entry, { recorder: false });
+      const result = pressMidiAssign(entry.component, target.part);
+      if (result.learn)
+        call("midiLearn");
+      if (result.learn || result.changed)
+        commit();
+      return;
+    }
+    if (!isMotionRecorder(entry.component))
+      return;
+    call("touch", entry, { recorder: true });
+    if (String(target.part) === "play")
+      recorder.play?.(entry);
+  }
+  const pageSide = (host, target) => target?.kind === "page" && (host.kind === "page" || host.kind === "mod" || host.kind === "pick" && pickPageTargets(host).some((item) => item.componentId === target.componentId));
+  const ownHost = (host, target) => Boolean(host) && (host.kind === target?.kind || pageSide(host, target) || (host.kind === "kfo" || host.kind === "pick") && target?.kind === "mod");
+  const bandTargetAt = (host, x, y) => {
+    for (const band2 of host.bands || []) {
+      const point = clientToHost(band2, x, y);
+      if (point.x < 0 || point.y < 0 || point.x > band2.sheet.width || point.y > band2.sheet.height)
+        continue;
+      const target = controlTargetAt(band2.sheet, point, previous?.kind === "page" && previous.band === band2.id ? previous : null);
+      return target ? { band: band2, target } : null;
+    }
+    return null;
+  };
+  return {
+    host: () => currentHost()?.element || null,
+    scale: () => {
+      const host = currentHost();
+      return host ? hostScale(host) : 1;
+    },
+    find(clientX, clientY) {
+      const host = currentHost();
+      if (!host)
+        return null;
+      const point = clientToHost(host, clientX, clientY);
+      if (host.kind === "kfo") {
+        const control = host.controls ? modCardTargetAt(host.controls, point, host.rect, previous?.kind === "mod" ? { id: own(previous) } : null) : null;
+        if (control)
+          return modTarget(host, control);
+        const target2 = kfoTargetAt(host, point, previous?.kind === "kfo" ? previous : null);
+        return target2 ? kfoTarget(host, target2) : null;
+      }
+      if (host.kind === "pick") {
+        const control = host.controls ? modCardTargetAt(host.controls, point, host.rect, previous?.kind === "mod" ? { id: own(previous) } : null) : null;
+        if (control)
+          return modTarget(host, control);
+        const target2 = pickTargetAt(host, point);
+        if (target2)
+          return pickTarget(host, target2);
+        const page = host.pages ? controlTargetAt(host.sheet, point, null) : null;
+        return page && pickPageTargets(host).some((item) => item.componentId === page.componentId) ? pageTarget(host, page) : null;
+      }
+      if (host.kind === "mod") {
+        const control = modCardTargetAt(host.controls, point, host.rect, previous?.kind === "mod" ? { id: own(previous) } : null);
+        if (control)
+          return modTarget(host, control);
+        const inBand = bandTargetAt(host, clientX, clientY);
+        if (inBand)
+          return bandTarget(inBand.band, inBand.target);
+      }
+      const button = buttonTargetAt(host, point);
+      if (button)
+        return button;
+      const target = controlTargetAt(host.sheet, point, previous?.kind === "page" ? previous : null);
+      return target ? pageTarget(host, target) : null;
+    },
+    targets() {
+      const host = currentHost();
+      if (!host)
+        return [];
+      if (host.kind === "kfo")
+        return [...(host.controls || []).map((control) => modTarget(host, control)), ...kfoHostTargets(host).map((target) => kfoTarget(host, target))];
+      if (host.kind === "pick")
+        return [...(host.controls || []).map((control) => modTarget(host, control)), ...pickTargets(host).map((target) => pickTarget(host, target)), ...pickPageTargets(host).map((target) => pageTarget(host, target))];
+      if (host.kind === "mod")
+        return [...host.controls.map((control) => modTarget(host, control)), ...buttonTargets(host).map((target) => buttonInCell(host, target)), ...controlTargets(host.sheet).map((target) => pageTarget(host, target)), ...(host.bands || []).flatMap((band2) => controlTargets(band2.sheet).map((target) => bandTarget(band2, target)))];
+      return [...buttonTargets(host).map((target) => buttonInCell(host, target)), ...controlTargets(host.sheet).map((target) => pageTarget(host, target))];
+    },
+    cells() {
+      const host = currentHost();
+      return [...stepCells(host), ...(host?.bands || []).flatMap(stepCells)];
+    },
+    locate(target) {
+      const host = currentHost();
+      if (target?.kind === "button") {
+        const current2 = buttonTargets(host).find((item) => item.id === target.id);
+        return current2 ? { point: current2.point, element: current2.element } : null;
+      }
+      if (!ownHost(host, target))
+        return null;
+      if (host.kind === "kfo" && target.kind === "kfo") {
+        const current2 = kfoHostTargets(host).find((item) => targetHandleKey(item) === target.key);
+        return current2 ? { point: hostToClient(host, current2.point), element: pageTargetElement(host.sheetElement, current2) } : null;
+      }
+      if (host.kind === "pick" && target.kind === "pick") {
+        const current2 = componentTargets3(host.sheet).find((item) => item.componentId === target.componentId);
+        return current2 ? { point: hostToClient(host, current2.point), element: pageTargetElement(host.sheetElement, current2) } : null;
+      }
+      if (target.kind === "mod") {
+        const control = host.controls.find((item) => item.id === own(target));
+        return control ? { point: hostToClient(host, control.point), element: modControlElement(host.element, control) } : null;
+      }
+      const at = pageHost(host, target), entry = targetEntry(at.sheet, target), current = entry && componentTarget(entry.component, entry.geometry, target.part);
+      return current ? { point: hostToClient(at, current.point), element: pageTargetElement(at.sheetElement, { ...target, ...current }) } : null;
+    },
+    companions(target) {
+      const host = currentHost();
+      if (!host || !pageSide(host, target) || target?.kind !== "page" || !host.sheetElement)
+        return [];
+      const at = pageHost(host, target);
+      return twinComponentIds(at.sheet?.cells, target.componentId).flatMap((id) => [...at.sheetElement.querySelectorAll(`[data-live-component-id="${cssEscape(id)}"] .component-live`)]);
+    },
+    highlight(target, info) {
+      showPaletteDropTarget(target);
+      if (target)
+        previous = target.kind === "page" || target.kind === "kfo" ? { kind: target.kind, id: target.id, cellId: target.cellId, componentId: target.componentId, part: target.part, band: target.band || null } : { kind: target.kind, id: target.id };
+      call("highlight", target, info);
+    },
+    press(target) {
+      const host = currentHost();
+      if (target?.kind === "button") {
+        if (buttonTargets(host).some((item) => item.id === target.id))
+          call("modToggle");
+        return;
+      }
+      if (!ownHost(host, target))
+        return;
+      if (pageSide(host, target)) {
+        if (host.kind === "mod" && !target.band)
+          mod.focus?.(target.componentId);
+        return pressPage(pageHost(host, target), target);
+      }
+      if (host.kind === "pick" && target.kind === "pick")
+        return call("pick", target.componentId);
+      if (host.kind === "kfo" && target.kind === "kfo")
+        return call("kfoTarget", target.key);
+      mod.press?.(target);
+    },
+    pressMove(target, at) {
+      const { entry, local } = gripDragAt(gripPress, target, at) || {};
+      if (entry && setPalettePickerOver(entry.component, palettePickerGroupAt(entry.component, local.x, local.y)))
+        call("render");
+    },
+    slides(from, to) {
+      const host = currentHost();
+      if (from?.kind !== "page" || to?.kind !== "page" || from.componentId !== to.componentId)
+        return false;
+      const hex = hexKeysSlide(from.part, to.part), flower = flowerKeysSlide(from.part, to.part);
+      if (!hex && !flower)
+        return false;
+      if (!ownHost(host, from) || !pageSide(host, from))
+        return false;
+      const component = targetEntry(pageHost(host, from).sheet, from)?.component;
+      return hex && (isHexKeyboard(component) || stepKeyboardSlides(component, from.part, to.part)) || flower && isRavaFlowerKeyboard(component);
+    },
+    pressEnd(target, at) {
+      releaseNote();
+      releaseWindow();
+      const drag = gripPress;
+      gripPress = null;
+      const { entry, local } = gripDragAt(drag, target, at) || {};
+      if (!entry)
+        return;
+      if (palettePickerPressAt(entry.component, local.x, local.y) === drag.target.part) {
+        if (setPalettePickerOver(entry.component, null))
+          call("render");
+        return;
+      }
+      if (dropPalettePickerGrip(entry.component, drag.group, local.x, local.y))
+        call("palette");
+      commit();
+    },
+    onAction: (action, address, event) => Boolean(call("onAction", action, address, event)),
+    onActionUp: (action, address) => Boolean(call("onActionUp", action, address)),
+    begin(target) {
+      const host = currentHost();
+      if (!ownHost(host, target))
+        return;
+      if (target.kind === "mod") {
+        const control = host.controls.find((item) => item.id === own(target));
+        if (control?.control === "pal-preset") {
+          held = { kind: "mod", level: control, drag: { x: 0, y: 0 } };
+          return;
+        }
+        if (control) {
+          held = { kind: "mod", level: control, value: num(mod.level?.(control), 0) };
+          mod.grab?.(control);
+        }
+        return;
+      }
+      if (!pageSide(host, target))
+        return;
+      const entry = targetEntry(pageHost(host, target).sheet, target);
+      if (!entry)
+        return;
+      if (host.kind === "mod" && !target.band)
+        mod.focus?.(entry.component.id);
+      const { cell, component, geometry } = entry, recording = isMotionRecorder(component);
+      call("touch", { ...entry, part: target.part ?? null }, { recorder: recording });
+      held = { kind: "page", ...entry, part: target.part, point: gestureAnchor(component, geometry, target.part) };
+      if (recording) {
+        recorder.begin?.(entry);
+        return;
+      }
+      const region = setComponentAt(cell, component, geometry, held.point, { part: target.part, press: true });
+      if (region)
+        call("holdRegion", region);
+      call("twins", entry);
+      call("redraw", entry);
+    },
+    travel(dx, dy) {
+      const host = currentHost();
+      if (!host || !held || host.kind !== held.kind && !(held.kind === "page" && host.kind === "mod"))
+        return;
+      if (held.kind === "mod") {
+        const { level } = held;
+        if (level.control === "pal-preset") {
+          held.drag = { x: held.drag.x + num(dx), y: held.drag.y + num(dy) };
+          modControlElement(host.element, level)?.setAttribute("transform", `translate(${held.drag.x} ${held.drag.y})`);
+          const over = paletteDropTarget(host.controls, level, held.drag)?.drop;
+          host.element.querySelectorAll("[data-palette-drop]").forEach((element) => element.removeAttribute("data-palette-drop"));
+          if (over)
+            modControlElement(host.element, over)?.setAttribute("data-palette-drop", "");
+          return;
+        }
+        held.value = modSliderAfterTravel(held.value, level.box, level.axis, level.range || "bipolar", dx, dy);
+        mod.setLevel?.(level, held.value);
+        modControlElements(host.element, level, { all: true }).forEach((element) => paintModLevel(element, held.value));
+        return;
+      }
+      const { cell, component, geometry, part } = held, entry = { cell, component, geometry }, point = { x: held.point.x + dx, y: held.point.y + dy };
+      if (isMotionRecorder(component))
+        recorder.travel?.(entry, point);
+      else {
+        const region = setComponentAt(cell, component, geometry, point, { part });
+        if (region)
+          call("holdRegion", region);
+        call("twins", entry);
+        call("redraw", entry);
+      }
+      held.point = gestureAnchor(component, geometry, part) || point;
+    },
+    end() {
+      const entry = held;
+      held = null;
+      if (entry?.kind === "mod") {
+        if (entry.level.control === "pal-preset") {
+          mod.dropPreset?.(entry.level, entry.drag);
+          return;
+        } else
+          mod.end?.(entry.level);
+        call("render");
+        return;
+      }
+      call("releaseRegions");
+      if (entry?.kind === "page" && !isMotionRecorder(entry.component))
+        call("release", { cell: entry.cell, component: entry.component, geometry: entry.geometry, part: entry.part ?? null });
+      if (entry && isMotionRecorder(entry.component) && recorder.end?.({ cell: entry.cell, component: entry.component, geometry: entry.geometry }))
+        return;
+      commit();
+    }
+  };
 }
 
 // library/ui/mod-surface.js
@@ -15377,7 +16291,7 @@ function pageTitleRect(sheet, spans, margin) {
   const height = Math.min(strip.height, band2 * MOD_SOLO_TITLE_SIZE / 0.8);
   return { box: box2(margin, strip.y + (strip.height - height) / 2, width, height), at: strip.at };
 }
-var spansOf = (rects) => list(rects).filter(Boolean).map((b) => ({ top: num(b.y), bottom: num(b.y) + num(b.height) }));
+var spansOf = (rects2) => list(rects2).filter(Boolean).map((b) => ({ top: num(b.y), bottom: num(b.y) + num(b.height) }));
 function modSoloTitleRect(layout, taken = []) {
   const w = layout?.window;
   const spans = [...w && num(w.r) > 0 ? [modWindowSpan(w)] : [], ...spansOf([...list(layout?.pages).map((page) => page.box), layout?.exit, ...list(taken)])];
@@ -15527,7 +16441,7 @@ function renderModSurfaceUnderSvg(layout, options = {}) {
   const to = windowInner(w), start = `--mod-ring-from:${round5(to > 0 ? Math.max(1, far / to) : 1)}`;
   const box0 = `x="${round5(f.x)}" y="${round5(f.y)}" width="${round5(f.width)}" height="${round5(f.height)}"`;
   const frame = `viewBox="${round5(f.x)} ${round5(f.y)} ${round5(f.width)} ${round5(f.height)}" width="${round5(f.width)}" height="${round5(f.height)}"`, at = `left:${round5(f.x)}px;top:${round5(f.y)}px`;
-  const roles = `<g style="${escOrBlank(options.roleStyle ? options.roleStyle(unit) : "")}">`;
+  const roles = `${roleRoot(options, unit)}`;
   const before = options.shift?.from, outlined = (window2) => list(window2?.outline).length > 2;
   const old = before && windowPath(before) && own && outlined(before) !== outlined(w) ? before : null;
   const centre4 = old ? outlined(w) ? w : old : null, about = centre4 ? ` style="transform-box:view-box;transform-origin:${round5(centre4.x)}px ${round5(centre4.y)}px"` : "";
@@ -15610,7 +16524,7 @@ function renderModSurfaceSvg(model, layout, options = {}) {
     const button2 = modPageButtonMarks(b, { words, current: page.current }, { look, styles, radius: options.radius });
     return `<g class="mod-control mod-button mod-page${page.current ? " current" : ""}" ${attributes(control)} data-mod-page="${escOrBlank(page.id)}" role="button" aria-pressed="${page.current}" aria-label="${escOrBlank(words)}">${hit(b)}${button2.press}${button2.frame}${button2.text}</g>`;
   }).join("");
-  return `<svg class="mod-card mod-surface" id="layout2-mod-surface" viewBox="0 0 ${round5(width)} ${round5(height)}" width="${round5(width)}" height="${round5(height)}"><g style="${escOrBlank(options.roleStyle ? options.roleStyle(unit) : "")}">${recordingRing}${options.noParams ? "" : params + note}${veil}${options.noParams ? "" : pickedRow}${title}${pageTitle}${ports}<g class="mod-cables">${cables}</g>${pageMarks}${exitMark}${labelsMark}</g></svg>`;
+  return `<svg class="mod-card mod-surface" id="layout2-mod-surface" viewBox="0 0 ${round5(width)} ${round5(height)}" width="${round5(width)}" height="${round5(height)}">${roleRoot(options, unit)}${recordingRing}${options.noParams ? "" : params + note}${veil}${options.noParams ? "" : pickedRow}${title}${pageTitle}${ports}<g class="mod-cables">${cables}</g>${pageMarks}${exitMark}${labelsMark}</g></svg>`;
 }
 function renderModKfoVeilSvg(veils, options = {}) {
   const look = modLook(normalizeModDesign(options.design)), w = look.words("paramLabel"), unit = num(options.unit, REFERENCE_UNIT);
@@ -15623,7 +16537,7 @@ function renderModKfoVeilSvg(veils, options = {}) {
   const targets = list(options.targets).map((target) => ({ selected: Boolean(target?.selected), points: list(Array.isArray(target) ? target : target?.points).map((p) => ({ x: round5(num(p.x)), y: round5(num(p.y)) })) })).filter((target) => target.points.length > 2).map((target) => `<path class="mod-kfo-outline ${target.selected ? "selected lm-role-recording" : "lm-role-highlight"}" d="${outlinePath(target.points)}"/>`).join("");
   const title = options.title?.box ? `<g class="mod-kfo-title" aria-hidden="true">${text(MOD_KFO_TITLE, options.title.box, options.labelStyles || [], "paragraph", { anchor: "middle", tier: w.tier })}</g>` : "";
   const rotates = list(options.rotates).map((control) => `<g class="mod-control kfo-target-rotate" ${controlAttributes(control)} data-rotation="${num(control.rotation)}" role="button" aria-label="Rotate one corner">${hit(control.box)}${rotateButtonMarks(control.box, control, look)}</g>`).join("");
-  return `<svg class="mod-card mod-kfo-veil" id="layout2-mod-kfo" viewBox="0 0 ${round5(width)} ${round5(height)}" width="${round5(width)}" height="${round5(height)}"><g style="${escOrBlank(options.roleStyle ? options.roleStyle(unit) : "")}">${covers}${words}${title}${targets}${ring}${rotates}</g></svg>`;
+  return `<svg class="mod-card mod-kfo-veil" id="layout2-mod-kfo" viewBox="0 0 ${round5(width)} ${round5(height)}" width="${round5(width)}" height="${round5(height)}">${roleRoot(options, unit)}${covers}${words}${title}${targets}${ring}${rotates}</g></svg>`;
 }
 var MOD_CONNECT_PICK = "pick a component to connect a modulation source";
 function modConnectWords(sheet, taken = [], margin = 0, areas = [], exits = []) {
@@ -15641,20 +16555,20 @@ function modConnectWords(sheet, taken = [], margin = 0, areas = [], exits = []) 
   const widest = spans.reduce((best, span2) => span2.width > best.width ? span2 : best);
   return widest.width > 0 ? box2(widest.x, b.y, widest.width, b.height) : null;
 }
-var modConnectExits = (rects) => list(rects).map((r, index) => ({ id: `connect-exit:${index}`, control: "connect-exit", action: "press", box: r, point: { x: num(r.x) + num(r.width) / 2, y: num(r.y) + num(r.height) / 2 } }));
+var modConnectExits = (rects2) => list(rects2).map((r, index) => ({ id: `connect-exit:${index}`, control: "connect-exit", action: "press", box: r, point: { x: num(r.x) + num(r.width) / 2, y: num(r.y) + num(r.height) / 2 } }));
 function renderModConnectSvg(options = {}) {
   const look = modLook(normalizeModDesign(options.design)), w = look.words("paramLabel"), unit = num(options.unit, REFERENCE_UNIT);
   const width = num(options.sheet?.width, 900), height = num(options.sheet?.height, 520);
   const words = options.words ? `<g class="mod-kfo-title" aria-hidden="true">${text(MOD_CONNECT_PICK, options.words, options.labelStyles || [], "paragraph", { anchor: "middle", tier: w.tier })}</g>` : "";
   const targets = list(options.targets).map((points) => list(points).map((p) => ({ x: round5(num(p.x)), y: round5(num(p.y)) }))).filter((points) => points.length > 2).map((points) => `<path class="mod-kfo-outline lm-role-highlight" d="${outlinePath(points)}"/>`).join("");
-  return `<svg class="mod-card mod-kfo-veil mod-connect" id="layout2-mod-connect" viewBox="0 0 ${round5(width)} ${round5(height)}" width="${round5(width)}" height="${round5(height)}" role="status" aria-label="${escOrBlank(MOD_CONNECT_PICK)}"><g style="${escOrBlank(options.roleStyle ? options.roleStyle(unit) : "")}">${words}${targets}</g></svg>`;
+  return `<svg class="mod-card mod-kfo-veil mod-connect" id="layout2-mod-connect" viewBox="0 0 ${round5(width)} ${round5(height)}" width="${round5(width)}" height="${round5(height)}" role="status" aria-label="${escOrBlank(MOD_CONNECT_PICK)}">${roleRoot(options, unit)}${words}${targets}</g></svg>`;
 }
 function renderModKfoExitSvg(place, control, options = {}) {
   const look = modLook(normalizeModDesign(options.design)), unit = num(options.unit, REFERENCE_UNIT), r = place;
   const w = look.words("buttonText");
   const body = options.body ? `<rect class="mod-card-body lm-role-surface" x="${r.x}" y="${r.y}" width="${r.width}" height="${r.height}" ${roundCorners(options.radius, r)}/>` : "";
   const mark = `<g class="mod-control mod-button mod-exit" ${controlAttributes(control)} role="button" aria-label="${escOrBlank(MOD_EXIT_LABEL)}">${hit(r)}${body}<rect class="lm-role-recording" x="${r.x}" y="${r.y}" width="${r.width}" height="${r.height}" ${roundCorners(options.radius, r)}${look.paint("frames")}/>${text(MOD_EXIT_LABEL, inset(r), options.labelStyles || [], w.kind, { anchor: "middle", tier: "recording" })}</g>`;
-  return `<svg class="mod-card mod-kfo-exit" id="layout2-mod-kfo-exit" viewBox="${round5(r.x)} ${round5(r.y)} ${round5(r.width)} ${round5(r.height)}" width="${round5(r.width)}" height="${round5(r.height)}"${options.attributes ? ` ${options.attributes}` : ""}><g style="${escOrBlank(options.roleStyle ? options.roleStyle(unit) : "")}">${mark}</g></svg>`;
+  return `<svg class="mod-card mod-kfo-exit" id="layout2-mod-kfo-exit" viewBox="${round5(r.x)} ${round5(r.y)} ${round5(r.width)} ${round5(r.height)}" width="${round5(r.width)}" height="${round5(r.height)}"${options.attributes ? ` ${options.attributes}` : ""}>${roleRoot(options, unit)}${mark}</g></svg>`;
 }
 function modPageButtonMarks(b, { words, current = false } = {}, { look, styles = [], radius = 0 } = {}) {
   const corners = roundCorners(radius, b), w = look.words("buttonText");
@@ -15666,128 +16580,6 @@ function modPageButtonMarks(b, { words, current = false } = {}, { look, styles =
 }
 var inset = (b) => box2(b.x + b.height * 0.15, b.y, Math.max(0.001, b.width - b.height * 0.3), b.height);
 var roundCorners = (radius, b) => `rx="${round5(Math.max(0, Math.min(num(radius, 0), b.width / 2, b.height / 2)))}"`;
-
-// library/ui/twins.js
-var drives = (slot) => slot && slot.enabled !== false && slot.instanceId && slot.paramId;
-var sameParameter = (a, b) => a.instanceId === b.instanceId && a.paramId === b.paramId;
-function feelPosition(slot, value, near = 0.5, regions = null) {
-  const feel = normalizeTarget(slot), error = (t) => Math.abs(slotValue(feel, t, regions) - value);
-  let best = clamp(num(near, 0.5), 0, 1), bestError = error(best);
-  for (let step = 0;step <= 400; step += 1) {
-    const t = step / 400, e = error(t);
-    if (e < bestError - 0.000000000001 || Math.abs(e - bestError) <= 0.000000000001 && Math.abs(t - near) < Math.abs(best - near)) {
-      best = t;
-      bestError = e;
-    }
-  }
-  let low = Math.max(0, best - 1 / 400), high = Math.min(1, best + 1 / 400);
-  for (let round6 = 0;round6 < 40; round6 += 1) {
-    const a = low + (high - low) / 3, b = high - (high - low) / 3;
-    if (error(a) <= error(b))
-      high = b;
-    else
-      low = a;
-  }
-  const refined = (low + high) / 2;
-  return error(refined) <= bestError ? refined : best;
-}
-var pathPart = (component, path) => {
-  const kind = componentKind(component);
-  return kind === "adsrPad" || kind === "filterPads" || kind === "delayQuadPad" || kind === "roomReverbPad" || kind === "warpChorusPad" || kind === "rotaryPad" || kind === "lfoPad" || kind === "distortionPad" || kind === "glideShiftPad" || kind === "chorusPad" || kind === "pabfoPad" || kind === "panPad" || kind === "duckPad" || kind === "randomPad" || kind === "stepSequencer" || kind === "scope" ? path.region : null;
-};
-function setPathPosition(cell, component, path, t) {
-  const target = clamp(num(t), 0, 1), gesture = component?.gesture;
-  if (!component || !path || gesture === "display" || gesture === "motion")
-    return false;
-  if (gesture !== "point") {
-    setComponentGesture(cell, component, { value: target, x: target, y: num(component.gesturePosition?.y, 0.5) });
-    return true;
-  }
-  if (isRotaryFlipPath(component, path))
-    return setRotaryFlip(component, path.axis, target >= 0.5);
-  const controls = componentControls(component);
-  if (controls)
-    return controls.setPathValue(component, path, target);
-  const part = pathPart(component, path), key = componentType(component).regionKey, region = REGION_PADS[componentKind(component)];
-  const at = region ? region.dot(region.model(component), part) : component.gesturePosition || { x: 0.55, y: 0.45 };
-  const move = (target_, x2, y2) => setComponentGesture(cell, target_, { x: x2, y: y2, ...part && key ? { [key]: part } : {} });
-  const kind = componentKind(component), model = component[kind] && typeof component[kind] === "object" ? kind : null;
-  const valueAt2 = (x2, y2) => {
-    const trial = { ...component, gesturePosition: { ...component.gesturePosition }, ...model ? { [model]: structuredClone(component[model]) } : {} };
-    move(trial, x2, y2);
-    return derivedOutputValue(trial, path);
-  };
-  let x = num(at?.x, 0.5), y = num(at?.y, 0.5);
-  for (let iteration = 0;iteration < 24; iteration += 1) {
-    const value = valueAt2(x, y), miss = target - value;
-    if (Math.abs(miss) < 0.00001)
-      break;
-    const epsilon = 0.001, gx = (valueAt2(x + epsilon, y) - valueAt2(x - epsilon, y)) / (2 * epsilon), gy = (valueAt2(x, y + epsilon) - valueAt2(x, y - epsilon)) / (2 * epsilon);
-    const length = gx * gx + gy * gy;
-    if (length < 0.000000001)
-      break;
-    x = clamp(x + miss * gx / length, 0, 1);
-    y = clamp(y + miss * gy / length, 0, 1);
-  }
-  move(component, x, y);
-  return true;
-}
-function followTwins(cells, moved) {
-  const done = new Set([moved?.id]), queue = moved ? [moved] : [], movedOnes = [];
-  while (queue.length) {
-    const from = queue.shift();
-    const values = list(from.paths).filter((path) => !path.parked).flatMap((path) => {
-      const t = derivedOutputValue(from, path);
-      return list(path.parameters).filter(drives).map((slot) => ({ slot, value: slotValue(normalizeTarget(slot), t, path.regions) }));
-    });
-    if (!values.length)
-      continue;
-    for (const cell of list(cells))
-      for (const other of list(cell?.components)) {
-        if (done.has(other.id))
-          continue;
-        let shares = false, moves = false;
-        for (const twinPath of list(other.paths)) {
-          if (twinPath.parked)
-            continue;
-          let match = null;
-          const twinSlot = list(twinPath.parameters).find((item) => drives(item) && (match = values.find((entry) => sameParameter(item, entry.slot))));
-          if (!twinSlot)
-            continue;
-          shares = true;
-          const now = derivedOutputValue(other, twinPath), wanted = feelPosition(twinSlot, match.value, now, twinPath.regions);
-          if (Math.abs(wanted - now) > 0.00001 && setPathPosition(cell, other, twinPath, wanted))
-            moves = true;
-        }
-        if (!shares)
-          continue;
-        done.add(other.id);
-        if (moves) {
-          movedOnes.push(other);
-          queue.push(other);
-        }
-      }
-  }
-  return movedOnes;
-}
-function twinComponentIds(cells, componentId) {
-  const components = list(cells).flatMap((cell) => list(cell?.components));
-  const driven = new Map(components.map((component) => [component.id, list(component.paths).filter((path) => !path.parked).flatMap((path) => list(path.parameters).filter(drives))]));
-  const shares = (a, b) => driven.get(a).some((slot) => driven.get(b).some((other) => sameParameter(slot, other)));
-  if (!driven.has(componentId))
-    return [];
-  const found = new Set([componentId]), queue = [componentId];
-  while (queue.length) {
-    const from = queue.shift();
-    for (const other of components)
-      if (!found.has(other.id) && shares(from, other.id)) {
-        found.add(other.id);
-        queue.push(other.id);
-      }
-  }
-  found.delete(componentId);
-  return [...found];
-}
 
 // library/runtime/levels.js
 var CARD_ID = "layout2-level-card";
@@ -16234,8 +17026,8 @@ var REGION_READINGS = Object.freeze({
   rotaryPad: { mix: ["mix", X], highRate: ["high", X], highWidth: ["high", ONE_MINUS_Y], lowRate: ["low", X], lowWidth: ["low", ONE_MINUS_Y], crossover: ["crossover", X] },
   lfoPad: { level: ["levelAttack", X], attack: ["levelAttack", Y], shape: ["shapeRate", ONE_MINUS_X], rate: ["shapeRate", Y], window: ["window", X] },
   distortionPad: {
-    drive: ["pad", (component) => isDistortionQuad(component) ? Y : measure(distortionPadTriangle(), 0, distortionPadSegments().drive)],
-    color: ["pad", (component) => isDistortionQuad(component) ? X : measure(distortionPadTriangle(), 0, distortionPadSegments().color)],
+    drive: ["pad", (component) => isDistortionQuad(component) ? Y : measure2(distortionPadTriangle(), 0, distortionPadSegments().drive)],
+    color: ["pad", (component) => isDistortionQuad(component) ? X : measure2(distortionPadTriangle(), 0, distortionPadSegments().color)],
     mix: ["strip", X]
   },
   glideShiftPad: {
@@ -16260,7 +17052,7 @@ var cornerList = (corners) => {
   c[8] = Math.min(4, corners.length);
   return c;
 };
-var measure = (corners, projection, segment = null, index = 0) => ({ kind: 2, c: [...cornerList(corners), projection, ...segment ? [segment[0].x, segment[0].y, segment[1].x, segment[1].y] : [0, 0, 0, 0], Math.round(num(index))] });
+var measure2 = (corners, projection, segment = null, index = 0) => ({ kind: 2, c: [...cornerList(corners), projection, ...segment ? [segment[0].x, segment[0].y, segment[1].x, segment[1].y] : [0, 0, 0, 0], Math.round(num(index))] });
 function motionHandleList(project3) {
   const out = [];
   for (const page of list(project3?.pages))
@@ -17814,739 +18606,6 @@ function createUpdateCheck({
   return { start, check, open: () => show(), close };
 }
 
-// library/ui/action.js
-var ONE_DOT = Object.freeze({ adjust: "one", press: "none", pressOnGrab: false });
-var PER_REGION = Object.freeze({ adjust: "per-region", press: "none", pressOnGrab: false });
-var NONE = Object.freeze({ adjust: "none", press: "none", pressOnGrab: false });
-var ACTION_KINDS = Object.freeze({
-  pad: ONE_DOT,
-  noisePad: ONE_DOT,
-  portamentoPad: ONE_DOT,
-  pitchShiftPad: ONE_DOT,
-  adsrPad: PER_REGION,
-  filterPads: PER_REGION,
-  delayQuadPad: PER_REGION,
-  roomReverbPad: PER_REGION,
-  warpChorusPad: PER_REGION,
-  lfoPad: PER_REGION,
-  distortionPad: PER_REGION,
-  glideShiftPad: PER_REGION,
-  pabfoPad: PER_REGION,
-  panPad: PER_REGION,
-  duckPad: PER_REGION,
-  randomPad: PER_REGION,
-  scope: PER_REGION,
-  stepSequencer: { adjust: "per-region", press: "cells", pressOnGrab: false },
-  ravaStepSequencer: { adjust: "per-region", press: "cells", pressOnGrab: false },
-  pageSwitcher: { adjust: "none", press: "pages", pressOnGrab: false },
-  palettePicker: { adjust: "none", press: "buttons", pressOnGrab: false },
-  patchPicker: { adjust: "none", press: "buttons", pressOnGrab: false },
-  diagramButton: { adjust: "none", press: "buttons", pressOnGrab: false },
-  handbookButton: { adjust: "none", press: "buttons", pressOnGrab: false },
-  levelSwitcher: { adjust: "none", press: "buttons", pressOnGrab: false },
-  levelStep: { adjust: "none", press: "buttons", pressOnGrab: false },
-  hexKeyboard: { adjust: "none", press: "buttons", pressOnGrab: false },
-  ravaFlowerKeyboard: { adjust: "none", press: "buttons", pressOnGrab: false },
-  ravaHoldButton: { adjust: "none", press: "buttons", pressOnGrab: false },
-  windowButton: { adjust: "none", press: "buttons", pressOnGrab: false },
-  navSettings: { adjust: "per-region", press: "buttons", pressOnGrab: false },
-  backgroundAnimation: { adjust: "per-region", press: "buttons", pressOnGrab: false },
-  ...Object.fromEntries(Object.keys(COMPONENT_CONTROLS).map((kind) => [kind, Object.freeze({ adjust: "per-region", press: "buttons", pressOnGrab: false })])),
-  modStack: { adjust: "per-region", press: "buttons", pressOnGrab: false },
-  midiAssign: { adjust: "none", press: "buttons", pressOnGrab: false },
-  rotaryPad: { adjust: "per-region", press: "buttons", pressOnGrab: false },
-  chorusPad: { adjust: "per-region", press: "buttons", pressOnGrab: false },
-  recorder: { adjust: "one", press: "strip", pressOnGrab: false },
-  paxDisplay: NONE,
-  ravaScope: NONE,
-  scopeTrace: NONE,
-  waterfall: NONE,
-  tuner: NONE,
-  levelText: NONE,
-  label: NONE,
-  other: NONE
-});
-var rects = new WeakMap;
-var rectsFrame = 0;
-function measure2(element) {
-  const raf = globalThis.requestAnimationFrame;
-  if (typeof raf !== "function")
-    return element.getBoundingClientRect();
-  const kept = rects.get(element);
-  if (kept)
-    return kept;
-  const rect2 = element.getBoundingClientRect();
-  rects.set(element, rect2);
-  if (!rectsFrame)
-    rectsFrame = raf(() => {
-      rectsFrame = 0;
-      rects = new WeakMap;
-    });
-  return rect2;
-}
-function hostScale(host) {
-  const rect2 = measure2(host.element);
-  return rect2.width / Math.max(1, host.sheet.width);
-}
-var hostToClient = (host, point) => {
-  const rect2 = measure2(host.element), scale = hostScale(host);
-  return { x: rect2.left + point.x * scale, y: rect2.top + point.y * scale };
-};
-var clientToHost = (host, x, y) => {
-  const rect2 = measure2(host.element), scale = hostScale(host);
-  return { x: (x - rect2.left) / scale, y: (y - rect2.top) / scale };
-};
-var rectToClient = (host, rect2) => {
-  const a = hostToClient(host, { x: rect2.left, y: rect2.top }), b = hostToClient(host, { x: rect2.right, y: rect2.bottom });
-  return { left: a.x, top: a.y, right: b.x, bottom: b.y };
-};
-var boxRect = (box3) => ({ left: box3.x, top: box3.y, right: box3.x + box3.width, bottom: box3.y + box3.height });
-function targetEntry(sheet, target) {
-  const cell = [...sheet.cells, ...sheet.frameCells || []].find((entry) => entry.id === target?.cellId), component = cell?.components.find((entry) => entry.id === target.componentId);
-  const geometry = component && cellGeometryOf(sheet, cell, layout2CellGeometry);
-  return geometry ? { cell, component, geometry } : null;
-}
-function gestureAnchor(component, geometry, part) {
-  const known = component.gesture === "point" || isMotionRecorder(component);
-  return known ? indicatorPoint2(component, geometry, part) : componentMapPoint(component, geometry, clamp(num(component.valueNormalized, 0.5), 0, 1), 0.5);
-}
-var HELD_REGIONS = Object.freeze({
-  adsrPad: { key: "adsrHeld", model: "adsrPad" },
-  filterPads: { key: "filterHeld", model: "filterPads" },
-  delayQuadPad: { key: "delayHeld", model: "delayQuadPad" },
-  roomReverbPad: { key: "roomHeld", model: "roomReverbPad" },
-  warpChorusPad: { key: "warpHeld", model: "warpChorusPad" },
-  rotaryPad: { key: "rotaryHeld", model: "rotaryPad" },
-  lfoPad: { key: "lfoHeld", model: "lfoPad" },
-  distortionPad: { key: "distortionHeld", model: "distortionPad" },
-  glideShiftPad: { key: "glideShiftHeld", model: "glideShiftPad" },
-  chorusPad: { key: "chorusHeld", model: "chorusPad" },
-  pabfoPad: { key: "pabfoHeld", model: "pabfoPad" },
-  panPad: { key: "panHeld", model: "panPad" },
-  duckPad: { key: "duckHeld", model: "duckPad" },
-  randomPad: { key: "randomHeld", model: "randomPad" },
-  stepSequencer: { key: "seqHeld", model: "stepSequencer" },
-  ravaStepSequencer: { key: "seqHeld", model: "ravaStepSequencer" },
-  navSettings: { key: "navHeld", model: "navSettings" },
-  backgroundAnimation: { key: "backgroundHeld", model: "backgroundAnimation" },
-  ...Object.fromEntries(Object.keys(COMPONENT_CONTROLS).map((kind) => [kind, { key: `${kind}Held`, model: kind }])),
-  modStack: { key: "stackHeld", model: "modStack" },
-  scope: { key: "scopeHeld", model: "scope" }
-});
-function setComponentAt(cell, component, geometry, point, { begin = false, part = null, press = false } = {}) {
-  const local = componentUnmapPoint(component, geometry, point);
-  const regionKey = componentType(component).regionKey, held = part && regionKey ? { [regionKey]: part } : {};
-  if (component.gesture === "point")
-    setComponentGesture(cell, component, { x: local.x, y: local.y, begin, press, ...held });
-  else
-    setComponentGesture(cell, component, { value: local.x, x: local.x, y: local.y });
-  const holding = HELD_REGIONS[componentKind(component)];
-  return holding ? { key: holding.key, value: { componentId: component.id, [regionKey]: component[holding.model].active } } : null;
-}
-function pageTargetElement(sheetElement, target) {
-  if (target.action === "view")
-    return null;
-  const id = cssEscape(target.componentId);
-  if (target.action === "press") {
-    const component = sheetElement.querySelector(`.layout2-component[data-product-component-id="${id}"]`);
-    if (!component)
-      return null;
-    if (target.part === "play")
-      return component.querySelector(".motion-play");
-    const part = cssEscape(String(target.part));
-    return component.querySelector(`[data-seq-press="${part}"], [data-page-press="${part}"], [data-panel-press="${part}"], [data-rotary-press="${part}"], [data-chorus-press="${part}"], [data-hex-press="${part}"]`);
-  }
-  const layer = sheetElement.querySelector(`[data-live-component-id="${id}"]`);
-  if (!layer)
-    return null;
-  if (!target.part)
-    return layer.querySelector(".component-live");
-  return layer.querySelector(`.component-live[data-region="${cssEscape(target.part)}"]`);
-}
-var pageTarget = (host, target) => ({ ...target, kind: "page", id: `page:${target.componentId}:${target.part}`, point: hostToClient(host, target.point), anchor: target.anchor && hostToClient(host, target.anchor), neighbours: target.neighbours && Object.fromEntries(Object.entries(target.neighbours).map(([direction, part]) => [direction, `page:${target.componentId}:${part}`])), rect: target.rect && rectToClient(host, target.rect), outline: target.outline && target.outline.map((point) => hostToClient(host, point)), element: pageTargetElement(host.sheetElement, target) });
-var BUTTON_SELECTOR = "[data-label-action]";
-var buttonTarget = (element) => {
-  const box3 = measure2(element), rect2 = { left: box3.left, top: box3.top, right: box3.right, bottom: box3.bottom };
-  return { kind: "button", id: `button:${element.dataset.buttonLabelId}`, labelId: element.dataset.buttonLabelId, labelAction: element.dataset.labelAction, action: "press", point: { x: (rect2.left + rect2.right) / 2, y: (rect2.top + rect2.bottom) / 2 }, rect: rect2, element };
-};
-var buttonTargets = (host) => (host?.kind === "page" || host?.kind === "mod") && host.sheetElement ? [...host.sheetElement.querySelectorAll(BUTTON_SELECTOR)].filter((element) => !cellVeiled(element.dataset.cellId)).map(buttonTarget) : [];
-var buttonFrame = (element) => (element.querySelector?.(".layout2-mod-button-frame")?.getAttribute("d")?.match(/-?[\d.]+,-?[\d.]+/g) || []).map((pair2) => {
-  const [x, y] = pair2.split(",").map(Number);
-  return { x, y };
-});
-function componentAtPoint(sheet, point) {
-  for (const cell of [...sheet?.cells || [], ...sheet?.frameCells || []]) {
-    const geometry = cell.components?.length && cellGeometryOf(sheet, cell, layout2CellGeometry);
-    const component = geometry && cell.components.find((item) => pointInPolygon(point, componentOutline(item, geometry)));
-    if (component)
-      return { cell, component, geometry };
-  }
-  return null;
-}
-var pointOnComponent = (sheet, point) => Boolean(componentAtPoint(sheet, point));
-function buttonTargetAt(host, point) {
-  if (!point || pointOnComponent(host?.sheet, point))
-    return null;
-  return buttonTargets(host).find((target) => {
-    const frame = buttonFrame(target.element);
-    return frame.length > 2 && pointInPolygon(point, frame);
-  }) || null;
-}
-var buttonInCell = (host, target) => {
-  const point = clientToHost(host, target.point.x, target.point.y), cell = frameCellAtPoint(host.sheet, point) || layout2CellAtPoint(host.sheet, point);
-  return cell ? { ...target, cellId: cell.id } : target;
-};
-function stepCells(host) {
-  const sheet = host?.sheet;
-  if (!sheet?.cells || !host.element)
-    return [];
-  const { nodes } = buildLayout2Graph(sheet), client = (point) => hostToClient(host, point);
-  const loop = (ids) => (ids || []).map((id) => nodes.get(id)).filter(Boolean).map(client);
-  return [
-    ...sheet.cells.map((cell) => ({ id: cell.id, loop: loop(cell.nodeIds), holes: (cell.holeNodeIds || []).map(loop).filter((hole) => hole.length > 2) })),
-    ...(sheet.frameCells || []).map((cell) => ({ id: cell.id, loop: (cell.geometry?.points || cell.geometry?.outline || []).map(client), holes: [] }))
-  ].filter((cell) => cell.loop.length > 2);
-}
-function componentTargets3(sheet, keep = () => true) {
-  const seen = new Set;
-  return controlTargets(sheet).filter((target) => {
-    if (seen.has(target.componentId) || !keep(target.componentId))
-      return false;
-    seen.add(target.componentId);
-    return true;
-  });
-}
-var pickTargets = (host) => componentTargets3(host.sheet, (id) => host.eligible.has(id));
-var pickTarget = (host, target) => ({ ...pageTarget(host, target), kind: "pick", id: `pick:${target.componentId}`, action: "press" });
-var pickPageTargets = (host) => host.pages ? controlTargets(host.sheet).filter((target) => {
-  const entry = targetEntry(host.sheet, target);
-  return entry && isPageSwitcher(entry.component);
-}) : [];
-function pickTargetAt(host, point) {
-  const target = controlTargetAt(host.sheet, point, null);
-  return target && host.eligible.has(target.componentId) ? pickTargets(host).find((item) => item.componentId === target.componentId) || null : null;
-}
-var targetHandleKey = (target) => handleKey(target.componentId, target.part);
-var kfoHostTargets = (host) => controlTargets(host.sheet).filter((target) => target.action === "adjust" && host.eligible.has(targetHandleKey(target)));
-var kfoTarget = (host, target) => ({ ...pageTarget(host, target), kind: "kfo", id: `kfo:${targetHandleKey(target)}`, key: targetHandleKey(target), action: "press" });
-function kfoTargetAt(host, point, previous = null) {
-  const found = controlTargetAt(host.sheet, point, previous);
-  if (!found)
-    return null;
-  const key = targetHandleKey(found);
-  return kfoHostTargets(host).find((target) => targetHandleKey(target) === key) || null;
-}
-function modControlElements(element, control, { all = false } = {}) {
-  if (!all)
-    return [...element.querySelectorAll(`[data-mod-id="${cssEscape(control.id)}"]`)];
-  const by = control.control === "route-level" ? `[data-mod-control="route-level"][data-mod-route="${cssEscape(control.routeId)}"]` : `[data-mod-control="${cssEscape(control.control)}"][data-mod-param="${cssEscape(control.param)}"]`;
-  const found = [...element.querySelectorAll(by)];
-  return found.length ? found : [...element.querySelectorAll(`[data-mod-id="${cssEscape(control.id)}"]`)];
-}
-function modControlElement(element, control) {
-  const found = modControlElements(element, control)[0] || null;
-  return control.action === "adjust" ? found?.querySelector(".mod-level-dot") || found : found;
-}
-var modTarget = (host, control) => ({ ...control, kind: "mod", id: `mod:${control.id}`, group: "mod-card", point: hostToClient(host, control.point), rect: rectToClient(host, boxRect(control.box)), element: modControlElement(host.element, control) });
-function paintModLevel(control, value) {
-  const [x, y, width, height] = control.dataset.modLevelBox.split(",").map(Number), range = control.dataset.modLevelRange || "bipolar";
-  const at = modSliderPoint({ x, y, width, height }, control.dataset.modLevelAxis, value, range), fill = control.querySelector(".mod-level-fill");
-  fill?.setAttribute("x2", at.x);
-  fill?.setAttribute("y2", at.y);
-  control.querySelector(".mod-level-indicator")?.setAttribute("transform", `translate(${at.x} ${at.y})`);
-  control.setAttribute("aria-valuenow", Math.round(value * 100));
-  const readout = control.querySelector("[data-mod-percent] tspan");
-  if (readout)
-    readout.textContent = modReadout(value, range, control.dataset.modFormat || "");
-}
-function indicatorLookVariables(indicator = {}) {
-  return {
-    "--nav-indicator-diameter": `${2 * clamp(num(indicator.size, 5), 1, 20)}px`,
-    "--nav-indicator-stroke": `${clamp(num(indicator.strokeWidth, 1), 0, 6)}px`
-  };
-}
-function actionHandoffOptions({ host: currentHost = () => null, hooks = {} } = {}) {
-  const call = (name, ...args) => typeof hooks[name] === "function" ? hooks[name](...args) : undefined;
-  const recorder = hooks.recorder || {}, mod = hooks.mod || {};
-  const own = (target) => String(target.id).slice(String(target.id).indexOf(":") + 1);
-  const pageHost = (host, target) => target?.band && host?.bands?.find((band2) => band2.id === target.band) || host;
-  const bandTarget = (band2, target) => ({ ...pageTarget(band2, target), band: band2.id, id: `page:${band2.id}:${target.componentId}:${target.part}` });
-  let previous = null, held = null;
-  let gripPress = null;
-  function gripDragAt(drag, target, at) {
-    const host = currentHost();
-    if (!drag || !at || drag.target.id !== target?.id || !host?.sheet)
-      return null;
-    const entry = targetEntry(host.sheet, drag.target);
-    return entry ? { entry, local: componentUnmapPoint(entry.component, entry.geometry, clientToHost(host, at.x, at.y)) } : null;
-  }
-  function showPaletteDropTarget(target) {
-    const host = currentHost();
-    if (gripPress || !host?.sheet)
-      return;
-    let changed = false;
-    for (const cell of host.sheet.cells || [])
-      for (const component of cell.components || []) {
-        if (!isPalettePicker(component) || !component.palettePicker?.lifted)
-          continue;
-        const part = target?.kind === "page" && target.componentId === component.id ? parsePaletteGroupPart(target.part) : null;
-        changed = setPalettePickerOver(component, part && (part.kind === "swatch" || part.kind === "grip") ? part.group : null) || changed;
-      }
-    if (changed)
-      call("render");
-  }
-  const commit = () => {
-    call("persist");
-    call("render");
-  };
-  let heldNote = null;
-  const releaseNote = () => {
-    if (heldNote === null)
-      return;
-    const note = heldNote;
-    heldNote = null;
-    call("noteOff", note);
-  };
-  let windowOn = false;
-  const releaseWindow = () => {
-    if (!windowOn)
-      return;
-    windowOn = false;
-    call("windowHold", false);
-    call("render");
-  };
-  function pressPage(host, target) {
-    const entry = targetEntry(host.sheet, target);
-    if (!entry)
-      return;
-    if (isStepSequencer(entry.component)) {
-      call("touch", entry, { recorder: false });
-      const result = pressStepKeyboard(entry.component, target.part);
-      if (result.note !== null) {
-        releaseNote();
-        heldNote = result.note;
-        call("noteOn", result.note, HEX_KEY_VELOCITY);
-      }
-      if (result.changed)
-        commit();
-      return;
-    }
-    if (isRavaStepSequencer(entry.component)) {
-      call("touch", entry, { recorder: false });
-      if (pressRavaStepSequencer(entry.component, target.part))
-        commit();
-      return;
-    }
-    if (isPageSwitcher(entry.component)) {
-      call("touch", entry, { recorder: false });
-      if (isConnectPart(target.part))
-        call("connect");
-      else if (target.part != null)
-        call("page", String(target.part), entry.component);
-      return;
-    }
-    if (isPalettePicker(entry.component)) {
-      call("touch", entry, { recorder: false });
-      const result = pressPalettePicker(entry.component, target.part), grip = parsePaletteGroupPart(target.part);
-      gripPress = grip?.kind === "grip" && entry.component.palettePicker?.lifted === grip.group ? { target, group: grip.group } : null;
-      if (result.palette)
-        call("palette");
-      commit();
-      if (result.edit !== null)
-        call("editSwatch", result.edit);
-      if (result.name)
-        call("namePalette", result.name, entry.component.id);
-      if (result.field)
-        call("editPaletteField", result.field, entry.component.id);
-      if (result.manage)
-        call("managePalettePresets", entry.component.id);
-      return;
-    }
-    if (isPatchPicker(entry.component)) {
-      call("touch", entry, { recorder: false });
-      const result = pressPatchPicker(entry.component, target.part);
-      if (result.patch)
-        call("patch");
-      commit();
-      if (result.name)
-        call("namePatch", result.name, entry.component.id);
-      if (result.manage)
-        call("managePatchPresets", entry.component.id);
-      return;
-    }
-    if (isHexKeyboard(entry.component)) {
-      call("touch", entry, { recorder: false });
-      const result = pressHexKeyboard(hexKeyboardSequencer(entry.component), target.part);
-      if (result.note !== null) {
-        releaseNote();
-        heldNote = result.note;
-        call("noteOn", result.note, HEX_KEY_VELOCITY);
-      }
-      if (result.changed)
-        commit();
-      return;
-    }
-    if (isRavaFlowerKeyboard(entry.component)) {
-      call("touch", entry, { recorder: false });
-      const note = pressRavaFlowerKeyboard(target.part);
-      if (note !== null) {
-        releaseNote();
-        heldNote = note;
-        call("noteOn", note, RAVA_FLOWER_VELOCITY);
-      }
-      return;
-    }
-    if (isRavaHoldButton(entry.component)) {
-      call("touch", entry, { recorder: false });
-      if (pressRavaHoldButton(target.part).hold) {
-        call("holdNote", RAVA_HOLD_NOTE);
-        call("render");
-      }
-      return;
-    }
-    if (isWindowButton(entry.component)) {
-      call("touch", entry, { recorder: false });
-      if (pressWindowButton(target.part).hold) {
-        windowOn = true;
-        call("windowHold", true);
-        call("render");
-      }
-      return;
-    }
-    if (isDiagramButton(entry.component)) {
-      call("touch", entry, { recorder: false });
-      if (pressDiagramButton(entry.component, target.part).open)
-        call("diagram", entry.component.id);
-      return;
-    }
-    if (isHandbookButton(entry.component)) {
-      call("touch", entry, { recorder: false });
-      if (pressHandbookButton(entry.component, target.part).open)
-        call("handbook", entry.component.id);
-      return;
-    }
-    if (isLevelSwitcher(entry.component)) {
-      call("touch", entry, { recorder: false });
-      if (pressLevelSwitcher(entry.component, target.part).list)
-        call("levelList", entry.component.id);
-      return;
-    }
-    if (isLevelStep(entry.component)) {
-      call("touch", entry, { recorder: false });
-      const result = pressLevelStep(entry.component, target.part);
-      if (result.back)
-        call("levelBack");
-      if (result.next)
-        call("levelNext");
-      return;
-    }
-    if (isNavSettings(entry.component)) {
-      call("touch", entry, { recorder: false });
-      if (pressNavSettings(entry.component, target.part))
-        commit();
-      return;
-    }
-    if (isBackgroundAnimation(entry.component)) {
-      call("touch", entry, { recorder: false });
-      const result = pressBackgroundAnimation(entry.component, target.part);
-      if (result.changed)
-        commit();
-      if (result.list)
-        call("manageAnimations", entry.component.id);
-      return;
-    }
-    const controls = componentControls(entry.component);
-    if (controls) {
-      call("touch", entry, { recorder: false });
-      if (controls.press(entry.component, target.part))
-        commit();
-      return;
-    }
-    if (isRotaryPad(entry.component)) {
-      call("touch", entry, { recorder: false });
-      if (pressRotaryPad(entry.component, target.part))
-        commit();
-      return;
-    }
-    if (isChorusPad(entry.component)) {
-      call("touch", entry, { recorder: false });
-      if (pressChorusPad(entry.component, target.part))
-        commit();
-      return;
-    }
-    if (isModStack(entry.component)) {
-      call("touch", entry, { recorder: false });
-      if (pressModStack(entry.component, target.part))
-        commit();
-      return;
-    }
-    if (isMidiAssign(entry.component)) {
-      call("touch", entry, { recorder: false });
-      const result = pressMidiAssign(entry.component, target.part);
-      if (result.learn)
-        call("midiLearn");
-      if (result.learn || result.changed)
-        commit();
-      return;
-    }
-    if (!isMotionRecorder(entry.component))
-      return;
-    call("touch", entry, { recorder: true });
-    if (String(target.part) === "play")
-      recorder.play?.(entry);
-  }
-  const pageSide = (host, target) => target?.kind === "page" && (host.kind === "page" || host.kind === "mod" || host.kind === "pick" && pickPageTargets(host).some((item) => item.componentId === target.componentId));
-  const ownHost = (host, target) => Boolean(host) && (host.kind === target?.kind || pageSide(host, target) || (host.kind === "kfo" || host.kind === "pick") && target?.kind === "mod");
-  const bandTargetAt = (host, x, y) => {
-    for (const band2 of host.bands || []) {
-      const point = clientToHost(band2, x, y);
-      if (point.x < 0 || point.y < 0 || point.x > band2.sheet.width || point.y > band2.sheet.height)
-        continue;
-      const target = controlTargetAt(band2.sheet, point, previous?.kind === "page" && previous.band === band2.id ? previous : null);
-      return target ? { band: band2, target } : null;
-    }
-    return null;
-  };
-  return {
-    host: () => currentHost()?.element || null,
-    scale: () => {
-      const host = currentHost();
-      return host ? hostScale(host) : 1;
-    },
-    find(clientX, clientY) {
-      const host = currentHost();
-      if (!host)
-        return null;
-      const point = clientToHost(host, clientX, clientY);
-      if (host.kind === "kfo") {
-        const control = host.controls ? modCardTargetAt(host.controls, point, host.rect, previous?.kind === "mod" ? { id: own(previous) } : null) : null;
-        if (control)
-          return modTarget(host, control);
-        const target2 = kfoTargetAt(host, point, previous?.kind === "kfo" ? previous : null);
-        return target2 ? kfoTarget(host, target2) : null;
-      }
-      if (host.kind === "pick") {
-        const control = host.controls ? modCardTargetAt(host.controls, point, host.rect, previous?.kind === "mod" ? { id: own(previous) } : null) : null;
-        if (control)
-          return modTarget(host, control);
-        const target2 = pickTargetAt(host, point);
-        if (target2)
-          return pickTarget(host, target2);
-        const page = host.pages ? controlTargetAt(host.sheet, point, null) : null;
-        return page && pickPageTargets(host).some((item) => item.componentId === page.componentId) ? pageTarget(host, page) : null;
-      }
-      if (host.kind === "mod") {
-        const control = modCardTargetAt(host.controls, point, host.rect, previous?.kind === "mod" ? { id: own(previous) } : null);
-        if (control)
-          return modTarget(host, control);
-        const inBand = bandTargetAt(host, clientX, clientY);
-        if (inBand)
-          return bandTarget(inBand.band, inBand.target);
-      }
-      const button = buttonTargetAt(host, point);
-      if (button)
-        return button;
-      const target = controlTargetAt(host.sheet, point, previous?.kind === "page" ? previous : null);
-      return target ? pageTarget(host, target) : null;
-    },
-    targets() {
-      const host = currentHost();
-      if (!host)
-        return [];
-      if (host.kind === "kfo")
-        return [...(host.controls || []).map((control) => modTarget(host, control)), ...kfoHostTargets(host).map((target) => kfoTarget(host, target))];
-      if (host.kind === "pick")
-        return [...(host.controls || []).map((control) => modTarget(host, control)), ...pickTargets(host).map((target) => pickTarget(host, target)), ...pickPageTargets(host).map((target) => pageTarget(host, target))];
-      if (host.kind === "mod")
-        return [...host.controls.map((control) => modTarget(host, control)), ...buttonTargets(host).map((target) => buttonInCell(host, target)), ...controlTargets(host.sheet).map((target) => pageTarget(host, target)), ...(host.bands || []).flatMap((band2) => controlTargets(band2.sheet).map((target) => bandTarget(band2, target)))];
-      return [...buttonTargets(host).map((target) => buttonInCell(host, target)), ...controlTargets(host.sheet).map((target) => pageTarget(host, target))];
-    },
-    cells() {
-      const host = currentHost();
-      return [...stepCells(host), ...(host?.bands || []).flatMap(stepCells)];
-    },
-    locate(target) {
-      const host = currentHost();
-      if (target?.kind === "button") {
-        const current2 = buttonTargets(host).find((item) => item.id === target.id);
-        return current2 ? { point: current2.point, element: current2.element } : null;
-      }
-      if (!ownHost(host, target))
-        return null;
-      if (host.kind === "kfo" && target.kind === "kfo") {
-        const current2 = kfoHostTargets(host).find((item) => targetHandleKey(item) === target.key);
-        return current2 ? { point: hostToClient(host, current2.point), element: pageTargetElement(host.sheetElement, current2) } : null;
-      }
-      if (host.kind === "pick" && target.kind === "pick") {
-        const current2 = componentTargets3(host.sheet).find((item) => item.componentId === target.componentId);
-        return current2 ? { point: hostToClient(host, current2.point), element: pageTargetElement(host.sheetElement, current2) } : null;
-      }
-      if (target.kind === "mod") {
-        const control = host.controls.find((item) => item.id === own(target));
-        return control ? { point: hostToClient(host, control.point), element: modControlElement(host.element, control) } : null;
-      }
-      const at = pageHost(host, target), entry = targetEntry(at.sheet, target), current = entry && componentTarget(entry.component, entry.geometry, target.part);
-      return current ? { point: hostToClient(at, current.point), element: pageTargetElement(at.sheetElement, { ...target, ...current }) } : null;
-    },
-    companions(target) {
-      const host = currentHost();
-      if (!host || !pageSide(host, target) || target?.kind !== "page" || !host.sheetElement)
-        return [];
-      const at = pageHost(host, target);
-      return twinComponentIds(at.sheet?.cells, target.componentId).flatMap((id) => [...at.sheetElement.querySelectorAll(`[data-live-component-id="${cssEscape(id)}"] .component-live`)]);
-    },
-    highlight(target, info) {
-      showPaletteDropTarget(target);
-      if (target)
-        previous = target.kind === "page" || target.kind === "kfo" ? { kind: target.kind, id: target.id, cellId: target.cellId, componentId: target.componentId, part: target.part, band: target.band || null } : { kind: target.kind, id: target.id };
-      call("highlight", target, info);
-    },
-    press(target) {
-      const host = currentHost();
-      if (target?.kind === "button") {
-        if (buttonTargets(host).some((item) => item.id === target.id))
-          call("modToggle");
-        return;
-      }
-      if (!ownHost(host, target))
-        return;
-      if (pageSide(host, target)) {
-        if (host.kind === "mod" && !target.band)
-          mod.focus?.(target.componentId);
-        return pressPage(pageHost(host, target), target);
-      }
-      if (host.kind === "pick" && target.kind === "pick")
-        return call("pick", target.componentId);
-      if (host.kind === "kfo" && target.kind === "kfo")
-        return call("kfoTarget", target.key);
-      mod.press?.(target);
-    },
-    pressMove(target, at) {
-      const { entry, local } = gripDragAt(gripPress, target, at) || {};
-      if (entry && setPalettePickerOver(entry.component, palettePickerGroupAt(entry.component, local.x, local.y)))
-        call("render");
-    },
-    slides(from, to) {
-      const host = currentHost();
-      if (from?.kind !== "page" || to?.kind !== "page" || from.componentId !== to.componentId)
-        return false;
-      const hex = hexKeysSlide(from.part, to.part), flower = flowerKeysSlide(from.part, to.part);
-      if (!hex && !flower)
-        return false;
-      if (!ownHost(host, from) || !pageSide(host, from))
-        return false;
-      const component = targetEntry(pageHost(host, from).sheet, from)?.component;
-      return hex && (isHexKeyboard(component) || stepKeyboardSlides(component, from.part, to.part)) || flower && isRavaFlowerKeyboard(component);
-    },
-    pressEnd(target, at) {
-      releaseNote();
-      releaseWindow();
-      const drag = gripPress;
-      gripPress = null;
-      const { entry, local } = gripDragAt(drag, target, at) || {};
-      if (!entry)
-        return;
-      if (palettePickerPressAt(entry.component, local.x, local.y) === drag.target.part) {
-        if (setPalettePickerOver(entry.component, null))
-          call("render");
-        return;
-      }
-      if (dropPalettePickerGrip(entry.component, drag.group, local.x, local.y))
-        call("palette");
-      commit();
-    },
-    onAction: (action, address, event) => Boolean(call("onAction", action, address, event)),
-    onActionUp: (action, address) => Boolean(call("onActionUp", action, address)),
-    begin(target) {
-      const host = currentHost();
-      if (!ownHost(host, target))
-        return;
-      if (target.kind === "mod") {
-        const control = host.controls.find((item) => item.id === own(target));
-        if (control?.control === "pal-preset") {
-          held = { kind: "mod", level: control, drag: { x: 0, y: 0 } };
-          return;
-        }
-        if (control) {
-          held = { kind: "mod", level: control, value: num(mod.level?.(control), 0) };
-          mod.grab?.(control);
-        }
-        return;
-      }
-      if (!pageSide(host, target))
-        return;
-      const entry = targetEntry(pageHost(host, target).sheet, target);
-      if (!entry)
-        return;
-      if (host.kind === "mod" && !target.band)
-        mod.focus?.(entry.component.id);
-      const { cell, component, geometry } = entry, recording = isMotionRecorder(component);
-      call("touch", { ...entry, part: target.part ?? null }, { recorder: recording });
-      held = { kind: "page", ...entry, part: target.part, point: gestureAnchor(component, geometry, target.part) };
-      if (recording) {
-        recorder.begin?.(entry);
-        return;
-      }
-      const region = setComponentAt(cell, component, geometry, held.point, { part: target.part, press: true });
-      if (region)
-        call("holdRegion", region);
-      call("twins", entry);
-      call("redraw", entry);
-    },
-    travel(dx, dy) {
-      const host = currentHost();
-      if (!host || !held || host.kind !== held.kind && !(held.kind === "page" && host.kind === "mod"))
-        return;
-      if (held.kind === "mod") {
-        const { level } = held;
-        if (level.control === "pal-preset") {
-          held.drag = { x: held.drag.x + num(dx), y: held.drag.y + num(dy) };
-          modControlElement(host.element, level)?.setAttribute("transform", `translate(${held.drag.x} ${held.drag.y})`);
-          const over = paletteDropTarget(host.controls, level, held.drag)?.drop;
-          host.element.querySelectorAll("[data-palette-drop]").forEach((element) => element.removeAttribute("data-palette-drop"));
-          if (over)
-            modControlElement(host.element, over)?.setAttribute("data-palette-drop", "");
-          return;
-        }
-        held.value = modSliderAfterTravel(held.value, level.box, level.axis, level.range || "bipolar", dx, dy);
-        mod.setLevel?.(level, held.value);
-        modControlElements(host.element, level, { all: true }).forEach((element) => paintModLevel(element, held.value));
-        return;
-      }
-      const { cell, component, geometry, part } = held, entry = { cell, component, geometry }, point = { x: held.point.x + dx, y: held.point.y + dy };
-      if (isMotionRecorder(component))
-        recorder.travel?.(entry, point);
-      else {
-        const region = setComponentAt(cell, component, geometry, point, { part });
-        if (region)
-          call("holdRegion", region);
-        call("twins", entry);
-        call("redraw", entry);
-      }
-      held.point = gestureAnchor(component, geometry, part) || point;
-    },
-    end() {
-      const entry = held;
-      held = null;
-      if (entry?.kind === "mod") {
-        if (entry.level.control === "pal-preset") {
-          mod.dropPreset?.(entry.level, entry.drag);
-          return;
-        } else
-          mod.end?.(entry.level);
-        call("render");
-        return;
-      }
-      call("releaseRegions");
-      if (entry?.kind === "page" && !isMotionRecorder(entry.component))
-        call("release", { cell: entry.cell, component: entry.component, geometry: entry.geometry, part: entry.part ?? null });
-      if (entry && isMotionRecorder(entry.component) && recorder.end?.({ cell: entry.cell, component: entry.component, geometry: entry.geometry }))
-        return;
-      commit();
-    }
-  };
-}
-
 // library/runtime/pitch-shift-key.js
 var PITCH_SHIFT_ACTION = "pitch.hold";
 function createPitchShiftKey({ project: project3, sound = null }) {
@@ -18827,7 +18886,8 @@ function createPageRuntime(options) {
       const previous = sheetElement.querySelector(`[data-label-id="${cssEscape(label.id)}"]`);
       if (!previous)
         return;
-      if (previous.previousElementSibling?.classList.contains("layout2-edge-label-path"))
+      const own = (element2) => Boolean(element2) && (element2.classList.contains("layout2-edge-label-path") || element2.classList.contains("layout2-filters") || element2.tagName === "filter");
+      while (own(previous.previousElementSibling))
         previous.previousElementSibling.remove();
       previous.outerHTML = renderCellLabel(label, geometry, cell, labelOptions);
       replacedPresses = true;
@@ -19680,7 +19740,11 @@ function createModHost(ctx) {
     const colors = modCardColors(roleColors(null, { palette: entry.palette, componentColors: design.colors }), design.colors);
     return {
       labelStyles: modTextStyles(entry, sheet),
-      roleStyle: (unit) => roleStyle(look, unit, colors),
+      roleStyle: (unit) => {
+        const roles = roleStyle(look, unit, colors);
+        return `${roles};${roleFilters(roles, unit).style}`;
+      },
+      roleFilters: (unit) => roleFilters(roleStyle(look, unit, colors), unit).defs,
       backdropStyle: (unit) => roleStyle(look, unit, modBackdropColors(roleColors(null, { palette: entry.palette, componentColors: design.colors }), design.colors)),
       levelDot: (unit) => indicatorMark({ indicator }, { x: 0, y: 0 }, indicatorSizes({ indicator }, unit).radius, "mod-level-dot"),
       radius: pageCornerRadius(sheet, entry)
@@ -19793,7 +19857,7 @@ function createModHost(ctx) {
       return geometry ? boundsOfPoints(componentOutline(component, geometry)) : null;
     }).filter(Boolean);
     const title = modKfoTitleRect(sheet, [...placed2, card.rect, exitRect], card.size.margin, pageAreaRects(sheet, projectPageAreas(ctx.project())));
-    const veils = renderModKfoVeilSvg(recording ? others() : [modKfoVeil(outline)], { sheet, words: !recording, ring, targets, rotates, title, labelStyles: options.labelStyles, design, roleStyle: options.roleStyle, unit: componentUnit(entry.component, entry.geometry) });
+    const veils = renderModKfoVeilSvg(recording ? others() : [modKfoVeil(outline)], { sheet, words: !recording, ring, targets, rotates, title, labelStyles: options.labelStyles, design, roleStyle: options.roleStyle, roleFilters: options.roleFilters, unit: componentUnit(entry.component, entry.geometry) });
     modDrawn = { controls: [...kfoCardControls(model, layout), ...rotates, exit], zones: [card.rect, ...rotates.map((control) => control.box), exitRect] };
     const cardOptions = { ...options, design, unit: card.size.unit };
     return veils + renderKfoCardSvg(model, layout, { ...cardOptions, attributes: `style="left:${card.rect.x}px;top:${card.rect.y}px"` }) + renderModKfoExitSvg(exitRect, exit, { ...cardOptions, body: true, attributes: `style="left:${exitRect.x}px;top:${exitRect.y}px"` });
@@ -19884,7 +19948,7 @@ function createModHost(ctx) {
     const exits = modConnectExits(rects2), unit = area ? componentUnit(area.components[0], area.geometry) : undefined;
     const words = modConnectWords(sheet, outlines.map((item) => boundsOfPoints(item.outline)), modRowMetrics(sheet).margin, pageAreaRects(sheet, projectPageAreas(ctx.project())), rects2);
     modDrawn = { controls: exits, zones: rects2 };
-    return renderModConnectSvg({ sheet, targets: outlines.filter((item) => offered.has(item.id)).map((item) => item.outline), words, labelStyles: options.labelStyles, design, roleStyle: options.roleStyle, unit }) + exits.map((exit) => renderModKfoExitSvg(exit.box, exit, { ...options, design, unit, attributes: `style="left:${exit.box.x}px;top:${exit.box.y}px"` })).join("");
+    return renderModConnectSvg({ sheet, targets: outlines.filter((item) => offered.has(item.id)).map((item) => item.outline), words, labelStyles: options.labelStyles, design, roleStyle: options.roleStyle, roleFilters: options.roleFilters, unit }) + exits.map((exit) => renderModKfoExitSvg(exit.box, exit, { ...options, design, unit, attributes: `style="left:${exit.box.x}px;top:${exit.box.y}px"` })).join("");
   }
   function modLitIds(sheet = ctx.layout2ForProject()) {
     const recorder = kfoModeRecorder(sheet);
@@ -19978,37 +20042,8 @@ function createModHost(ctx) {
     return text2.replace(/^Key(?=[A-Z]$)/, "").replace(/^Digit(?=\d$)/, "");
   };
   const modKeyLabel = () => (ctx.projectNavigation().keymap[MOD_ACTION] || []).map(inputName).join(" / ") || "The mod key (unassigned)";
-  const HELP_HINT_KEY = "lemnos.helpHintHidden";
-  function helpHintHidden() {
-    try {
-      return localStorage.getItem(HELP_HINT_KEY) === "1";
-    } catch {
-      return false;
-    }
-  }
-  function setHelpHintHidden(hidden) {
-    try {
-      if (hidden)
-        localStorage.setItem(HELP_HINT_KEY, "1");
-      else
-        localStorage.removeItem(HELP_HINT_KEY);
-    } catch {}
-  }
-  let helpHintTimer = 0;
-  function showHelpHint(show) {
-    clearTimeout(helpHintTimer);
-    ctx.state.helpHint = show;
-    if (show)
-      helpHintTimer = setTimeout(() => {
-        if (ctx.state.helpHint) {
-          ctx.state.helpHint = false;
-          ctx.render();
-        }
-      }, HELP_HINT_SECONDS * 1000);
-  }
   function toggleHelp() {
     ctx.state.help = !ctx.state.help;
-    ctx.state.helpHint = false;
     ctx.render();
   }
   function toggleHelpFromAction() {
@@ -20022,24 +20057,15 @@ function createModHost(ctx) {
       ctx.runtime.levels.closeList();
       return true;
     }
-    if (!ctx.state.layout2TestMode || !ctx.state.help && !ctx.state.helpHint)
+    if (!ctx.state.layout2TestMode || !ctx.state.help)
       return false;
-    if (ctx.state.help)
-      ctx.state.help = false;
-    else
-      ctx.state.helpHint = false;
+    ctx.state.help = false;
     ctx.render();
     return true;
   }
   function pressHelpControl(control) {
     if (control.control === "help-close")
       ctx.state.help = false;
-    else if (control.control === "help-hint-show")
-      setHelpHintHidden(!helpHintHidden());
-    else if (control.control === "help-hint-hide") {
-      setHelpHintHidden(true);
-      ctx.state.helpHint = false;
-    }
     ctx.render();
   }
   function pageComponentBounds(sheet, match) {
@@ -20054,18 +20080,13 @@ function createModHost(ctx) {
   let helpDrawn = null;
   function helpCards(sheet) {
     const levelCard = ctx.state.layout2TestMode ? ctx.runtime.levels?.listCard() : null;
-    if (!ctx.state.layout2TestMode || !ctx.state.help && !ctx.state.helpHint && !levelCard)
+    if (!ctx.state.layout2TestMode || !ctx.state.help && !levelCard)
       return null;
     const design = modDesignFor(), sizing = { labelSize: modLabelSize(ctx.project(), sheet), scale: 1 }, navigation = ctx.projectNavigation(), cards = [];
     if (ctx.state.help) {
-      const model = helpCardModel({ actions: ctx.projectNavigationProfile()?.actions || [], keymap: navigation.keymap, rules: navigation.rules, inputName, hintShown: !helpHintHidden() });
+      const model = helpCardModel({ actions: ctx.projectNavigationProfile()?.actions || [], keymap: navigation.keymap, rules: navigation.rules, inputName });
       const size = helpCardSize(model, sheet, sizing), layout = helpCardLayout(model, helpCardPlacement(sheet, size), size);
       cards.push({ kind: "help", model, size, layout, controls: helpCardControls(model, layout) });
-    } else if (ctx.state.helpHint) {
-      const words = helpHintWords((navigation.keymap[HELP_ACTION] || []).map(inputName)[0] || "I"), size = helpHintSize(words, sheet, sizing);
-      const top = Math.min(0, ...(sheetWithPageAreas(sheet, ctx.project()).frameCells || []).flatMap((cell) => cell.geometry.outline.map((point) => point.y)));
-      const layout = helpHintLayout(helpHintPlacement(sheet, size, pageComponentBounds(sheet, isPageSwitcher), { top }), size);
-      cards.push({ kind: "hint", words, size, layout, controls: helpHintControls(layout) });
     }
     const switcher = levelCard && pageComponentBounds(sheet, (component) => component.id === levelCard.componentId);
     if (switcher) {
@@ -20077,10 +20098,26 @@ function createModHost(ctx) {
     }
     if (!cards.length)
       return null;
-    return { design, cards, controls: cards.flatMap((card) => card.controls), rects: cards.map((card) => card.layout.rect) };
+    return { design, cards };
+  }
+  const lockingCards = () => helpDrawn?.cards || [];
+  let cardsUp = "";
+  function landOnCard(card) {
+    const first = card.kind === "level" ? card.controls.find((control) => control.id === `lvl-level:${card.model.current}`) || card.controls[0] : card.controls.find((control) => control.id === "help-close");
+    if (!first || typeof requestAnimationFrame !== "function")
+      return;
+    requestAnimationFrame(() => {
+      const handoff = ctx.cursorHandoff, host = handoff?.virtual() ? actionHost(document.querySelector("#layout2-sheet")) : null;
+      if (host?.card && host.controls.some((control) => control.id === first.id))
+        handoff.focus(modTarget(host, first));
+    });
   }
   function renderHelpOverlay(sheet) {
     const drawn = helpDrawn = helpCards(sheet);
+    const locking = lockingCards(), up = locking.map((card) => card.kind).join(" ");
+    if (up && up !== cardsUp)
+      landOnCard(locking.at(-1));
+    cardsUp = up;
     if (!drawn)
       return "";
     const options = modRenderOptions(ctx.project(), drawn.design, sheet);
@@ -20088,7 +20125,7 @@ function createModHost(ctx) {
       const common = { ...options, design: drawn.design, unit: card.size.unit, attributes: `style="left:${card.layout.rect.x}px;top:${card.layout.rect.y}px"` };
       if (card.kind === "level")
         return renderLevelCardSvg(card.model, card.layout, common);
-      return card.kind === "help" ? renderHelpCardSvg(card.model, card.layout, common) : renderHelpHintSvg(card.words, card.layout, common);
+      return renderHelpCardSvg(card.model, card.layout, common);
     }).join("");
     return `<div class="mod-overlay help-overlay" id="layout2-help">${markup}</div>`;
   }
@@ -20274,6 +20311,12 @@ function createModHost(ctx) {
     const sheet = ctx.layout2ForProject();
     if (connectActive())
       return sheetElement ? connectHost(sheet, sheetElement) : null;
+    const locking = lockingCards();
+    if (locking.length && sheetElement) {
+      const framed2 = sheetWithPageAreas(sheet, ctx.project()), openers = new Set(locking.map((card) => card.model.componentId).filter(Boolean));
+      const opener = (cell) => cell.components.some((component) => openers.has(component.id));
+      return { kind: "mod", card: true, element: sheetElement, sheetElement, sheet: { ...framed2, cells: framed2.cells.filter(opener), frameCells: (framed2.frameCells || []).filter(opener) }, bands: [], controls: locking.flatMap((card) => card.controls), rect: locking.map((card) => card.layout.rect) };
+    }
     if (modActive()) {
       if (!sheetElement)
         return null;
@@ -20284,10 +20327,8 @@ function createModHost(ctx) {
         return { kind: "kfo", element: sheetElement, sheetElement, sheet, eligible: kfoModeEligible(sheet, recorder), ...card };
       const selected = sheet.cells.filter((cell) => cell.components.some((component) => component.id === ctx.state.modComponent)), area = areaOfComponent(sheet, ctx.state.modComponent);
       const bands = ctx.state.modPicking ? [] : [...sheetElement.querySelectorAll("[data-mod-band-sheet]")].map((element) => ({ id: element.dataset.modBandSheet, kind: "page", element, sheetElement: element, sheet: modBandSheet(element.dataset.modBandSheet) })).filter((band2) => band2.sheet);
-      return { kind: "mod", element: sheetElement, sheetElement, sheet: { ...sheet, cells: selected, frameCells: area ? [area] : [] }, bands, controls: [...helpDrawn?.controls || [], ...modDrawn?.controls || []], rect: [...helpDrawn?.rects || [], ...modDrawn?.zones || []] };
+      return { kind: "mod", element: sheetElement, sheetElement, sheet: { ...sheet, cells: selected, frameCells: area ? [area] : [] }, bands, controls: modDrawn?.controls || [], rect: modDrawn?.zones || [] };
     }
-    if (helpDrawn && sheetElement)
-      return { kind: "mod", element: sheetElement, sheetElement, sheet: sheetWithPageAreas(sheet, ctx.project()), controls: helpDrawn.controls, rect: helpDrawn.rects };
     return null;
   }
   function modKeyAction(address, event) {
@@ -20327,7 +20368,6 @@ function createModHost(ctx) {
     enterModMode,
     flushModParam,
     grabModSlider,
-    helpHintHidden,
     inputName,
     kfoModeEligible,
     kfoModeRecorder,
@@ -20353,7 +20393,6 @@ function createModHost(ctx) {
     renderModOverlay,
     renderModTestNote,
     setModLevel,
-    showHelpHint,
     startConnect,
     toggleHelpFromAction,
     toggleKfoTarget,

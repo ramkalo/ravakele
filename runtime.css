@@ -75,7 +75,7 @@
 @keyframes mod-shift-out { from, 60% { opacity: 1; } to { opacity: 0; } }
 @keyframes mod-ring-swoop { from { transform: scale(var(--mod-ring-from)); } to { transform: none; } }
 @keyframes mod-fade { from { opacity: 0; } to { opacity: 1; } }
-/* The Help card and the help hint float above mod mode's cards. */
+/* The Help card floats above mod mode's cards. */
 .layout2-sheet .help-overlay { z-index: 8; }
 .mod-pick-banner { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; align-items: baseline; gap: 10px; max-width: calc(100% - 32px); padding: 6px 14px; border: 1px solid rgba(255, 255, 255, .18); border-radius: 999px; background: rgba(10, 13, 18, .88); color: #e8edf2; font-family: var(--lm-paragraph-family); font-weight: var(--lm-paragraph-weight); font-size: var(--lm-paragraph-size); letter-spacing: var(--lm-paragraph-tracking); text-transform: var(--lm-paragraph-case, none); white-space: nowrap; pointer-events: none; box-shadow: 0 6px 18px rgba(0, 0, 0, .4); }
 .mod-pick-banner span { overflow: hidden; text-overflow: ellipsis; }

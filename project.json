@@ -3,7 +3,7 @@
   "schemaVersion": 96,
   "name": "Ravakele",
   "createdAt": "2026-11-11T00:32:43.443Z",
-  "updatedAt": "2026-11-23T04:18:42.153Z",
+  "updatedAt": "2026-11-23T05:53:37.941Z",
   "pages": [
     {
       "id": "page_mwbdxcc2_pn3uw",
@@ -2687,7 +2687,7 @@
                   "end": 0.8,
                   "points": {
                     "level": {
-                      "x": 0.7535498936359984
+                      "x": 0.24931079802957393
                     }
                   },
                   "active": "level"
@@ -5842,7 +5842,7 @@
         {
           "id": "level_mwcif8ac_j1rtf",
           "name": "",
-          "text": "If you CAN hear sound, then click Next to learn more about navigation.",
+          "text": "If you CAN hear sound, then click \"Next\" to learn more about navigation.",
           "pageId": null,
           "open": [
             "cell_mwbobc6o_1bvez",
@@ -6639,7 +6639,7 @@
         {
           "id": "level_mws8ea4h_borvr",
           "name": "",
-          "text": "The waves travels from the oscillator TO the amplifier.",
+          "text": "The sound waves travel from the oscillator to the amplifier.",
           "pageId": null,
           "open": [
             "cell_mwbpebpm_7aa36",
@@ -6919,7 +6919,7 @@
         {
           "id": "level_mws9y7b4_9njns",
           "name": "",
-          "text": "Second, some of the notes have a hashtag symbol: #\n\nA4, A#4, B4, C5, C#5, D5, D#5, E5, F5, F#5, G5, G#5, A5",
+          "text": "Second, some of the notes have a hashtag symbol (#)\n\nA4, A#4, B4, C5, C#5, D5, D#5, E5, F5, F#5, G5, G#5, A5",
           "pageId": null,
           "open": [
             "cell_mwbpebpm_7aa36",
@@ -6961,7 +6961,7 @@
         {
           "id": "level_mwsa2p1h_izyvl",
           "name": "",
-          "text": "Some frequencies, like F and G, have a frequency placed between them. While frequencies like B and C do not.\n\nA4, A#4, B4, C5, C#5, D5, D#5, E5, F5, F#5, G5, G#5, A5\n",
+          "text": "Some frequencies, like F and G, have a frequencies labeled with a # between them. While frequencies like B and C do not.\n\nA4, A#4, B4, C5, C#5, D5, D#5, E5, F5, F#5, G5, G#5, A5",
           "pageId": null,
           "open": [
             "cell_mwbpebpm_7aa36",
@@ -7304,7 +7304,7 @@
         {
           "id": "level_mwscdc7p_vt6t4",
           "name": "",
-          "text": "the \"A\" string on a guitar makes a sound wave which has many frequencies, but the A2 frequency is the one with the most amplitude.",
+          "text": "The \"A\" string on a guitar makes a sound wave which has many frequencies, but the A2 frequency is the one with the most amplitude.",
           "pageId": null,
           "open": [
             "cell_mwbpebpm_7aa36",
@@ -7775,7 +7775,7 @@
         {
           "id": "level_mwsefi4e_2ox8e",
           "name": "",
-          "text": "This is because the Filter uses something called a logarithmic scale. This method of displaying frequencies is very common in sound design.",
+          "text": "This is because the filter uses something called a logarithmic scale. This method of displaying frequencies is very common in sound design.",
           "pageId": null,
           "open": [
             "cell_mwbpebpm_7aa36",
@@ -7950,7 +7950,7 @@
       ]
     }
   ],
-  "level": "level_mwsidzyv_2kjmi",
+  "level": "level_mwbphn25_ack0j",
   "palette": [
     {
       "color": "#ffffff",

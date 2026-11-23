@@ -13,13 +13,13 @@
 .layout2-network { display: block; overflow: hidden; }
 .layout2-cell { stroke: none; }
 /* The highlight (render-svg.js componentHighlight): the targeted component's edge lights — an inner glow (no edge line)
-   along its own outline in its highlight tier, its glow sized by the component (--lm-highlight-glow-width,
-   --lm-highlight-blur) and its strength by the design (--lm-highlight-intensity on the <svg>). It shows while the
+   along its own outline in its highlight tier, its glow sized by the component (--lm-highlight-glow-width, and its
+   blur, the `edge` filter: roles.js roleFilters) and its strength by the design (--lm-highlight-intensity on the <svg>). It shows while the
    component is targeted (.layout2-targeted: library/ui/targeting.js markTargeted, from the pointer, the stick or d-pad's
    highlight, or keyboard focus); a page switcher's buttons each have their own. */
 .layout2-highlight { opacity: 0; pointer-events: none; transition: opacity .18s ease; }
 .layout2-highlight.layout2-targeted { opacity: 1; }
-.layout2-highlight-glow { fill: none; stroke: color-mix(in srgb, var(--lm-highlight-color) calc(56% * var(--lm-highlight-intensity, .5)), transparent); stroke-width: var(--lm-highlight-glow-width); filter: blur(var(--lm-highlight-blur)); }/* Reveal on target (design.reveal, by color group): a component's "hover" marks show only while it is targeted
+.layout2-highlight-glow { fill: none; stroke: color-mix(in srgb, var(--lm-highlight-color) calc(56% * var(--lm-highlight-intensity, .5)), transparent); stroke-width: var(--lm-highlight-glow-width); filter: var(--lm-f-edge); }/* Reveal on target (design.reveal, by color group): a component's "hover" marks show only while it is targeted
    (.layout2-targeted), its "off-hover" marks only while it is not. They move as they show (design.reveal.motion, the
    <svg>'s data-hover-motion) about the component's centre (.layout2-hover-origin, --hover-origin), shared by every
    wrapper of that component, so its parts stay aligned. Leaving the shown state is quick and plain; entering it is a little longer, with a slight overshoot.
@@ -95,7 +95,7 @@
    and a tint of it, at the design's highlight intensity); selected (lm-selected) a Color 1 outline. A wash is a faint
    fill of Color 1. */
 .lm-role-press { fill: currentColor; stroke: none; pointer-events: auto; }
-.lm-role-press.lm-on { fill: color-mix(in oklab, var(--lm-press-on-color) calc(56% * var(--lm-highlight-intensity, .5)), var(--lm-press-color)); filter: drop-shadow(0 0 var(--lm-glow) var(--lm-press-on-color)); }
+.lm-role-press.lm-on { fill: color-mix(in oklab, var(--lm-press-on-color) calc(56% * var(--lm-highlight-intensity, .5)), var(--lm-press-color)); filter: var(--lm-f-on); }
 .lm-role-press.lm-selected { stroke: var(--lm-press-on-color); stroke-width: var(--lm-highlight-stroke); }
 .lm-role-press.lm-wash { fill: var(--lm-handle-wash); pointer-events: none; }
 /* A recorder's Play is its whole bottom region: unlit and not highlighted it leaves the one ground showing (a divider line
@@ -104,13 +104,13 @@
 .nav-host .motion-play.lm-role-press:is(.nav-available, .nav-held) { fill-opacity: 1; }
 /* Level back and Level next: no plate of their own, highlighted or not, their word on the component's background. */
 .level-step-button.lm-role-press { fill-opacity: 0; }
-/* Pulse: a press mark slowly fading in and out of the lit look (lm-on); steady lit where motion is reduced. */
+/* Pulse: a press mark's tint slowly fading in and out of the lit one (lm-on), without its glow (a filter cannot fade); steady lit where motion is reduced. */
 .lm-role-press.lm-pulse { animation: lm-pulse 2.4s ease-in-out infinite; }
 @keyframes lm-pulse {
-  0%, 100% { fill: var(--lm-press-color); filter: drop-shadow(0 0 0 transparent); }
-  50% { fill: color-mix(in oklab, var(--lm-press-on-color) calc(56% * var(--lm-highlight-intensity, .5)), var(--lm-press-color)); filter: drop-shadow(0 0 var(--lm-glow) var(--lm-press-on-color)); }
+  0%, 100% { fill: var(--lm-press-color); }
+  50% { fill: color-mix(in oklab, var(--lm-press-on-color) calc(56% * var(--lm-highlight-intensity, .5)), var(--lm-press-color)); }
 }
-.component-region-glow.lm-wash { filter: drop-shadow(0 0 var(--lm-glow) var(--lm-handle-wash)); }
+.component-region-glow.lm-wash { filter: var(--lm-f-wash); }
 /* An indicator outside a host's states (the editor) shows its available look: a whole ring over a half fill. */
 .lm-role-indicator { fill: var(--lm-handle-fill); stroke: currentColor; stroke-width: var(--lm-indicator-stroke); }
 .lm-role-indicator.lm-role-recording { stroke: var(--lm-recording-color); }
@@ -142,7 +142,7 @@
 /* The unveil ring (render-svg.js renderUnveilRings): a cell a level has just opened rings in its highlight tier (Color 1),
    glowing, and fades out over UNVEIL_RING_SECONDS (library/ui/levels.js); a redraw resumes it by its negative delay. */
 .layout2-unveil-rings { pointer-events: none; }
-.layout2-unveil-ring { fill: none; stroke: currentColor; stroke-width: calc(var(--lm-highlight-stroke) * 1.5); stroke-linejoin: round; filter: drop-shadow(0 0 var(--lm-glow) currentColor) drop-shadow(0 0 calc(var(--lm-glow) * 2.5) currentColor); opacity: 0; animation: layout2-unveil-fade 3s ease-out forwards; /* duration: UNVEIL_RING_SECONDS, set inline */ }
+.layout2-unveil-ring { fill: none; stroke: currentColor; stroke-width: calc(var(--lm-highlight-stroke) * 1.5); stroke-linejoin: round; filter: var(--lm-f-ring); opacity: 0; animation: layout2-unveil-fade 3s ease-out forwards; /* duration: UNVEIL_RING_SECONDS, set inline */ }
 @keyframes layout2-unveil-fade { 0%, 15% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes motion-armed-blink { from { opacity: 1; } to { opacity: .35; } }
 .layout2-component.product-control { cursor: pointer; outline: none; }
@@ -169,12 +169,12 @@
 .nav-virtual-pointer .adsr-pad-hover:has([data-adsr-region="release"].nav-available) .adsr-pad-seam[data-adsr-seam="1"],
 .adsr-pad-hover[data-adsr-held="release"] .adsr-pad-seam[data-adsr-seam="1"] { opacity: 1; }
 /* The LFO pad's glow (render-svg.js lfoWaveGlow): the wave again under itself, with the whole glow. Only its opacity moves with the LFO. */
-.lfo-pad-halo { filter: drop-shadow(0 0 calc(var(--lm-glow) * .75) currentColor) drop-shadow(0 0 calc(var(--lm-glow) * 1.75) currentColor); }
+.lfo-pad-halo { filter: var(--lm-f-halo); }
 /* ADSR pad motion: a ball flows along the running stage's line, and the sustain line lights up and glows while Sustain
    holds. It always animates, Reduce Motion or not (the designer's choice). */
 .adsr-pad-sustain { opacity: 0; transition: opacity .12s ease; }
-.adsr-pad-sustain[data-lit] { opacity: 1; stroke-width: calc(var(--lm-drawing-stroke) * 2); filter: drop-shadow(0 0 var(--lm-glow) currentColor); }
-.adsr-pad-ball { filter: drop-shadow(0 0 var(--lm-glow) currentColor); }
+.adsr-pad-sustain[data-lit] { opacity: 1; stroke-width: calc(var(--lm-drawing-stroke) * 2); filter: var(--lm-f-self); }
+.adsr-pad-ball { filter: var(--lm-f-self); }
 .adsr-pad-ball[data-off] { display: none; }
 /* Duck pad: its two seams fade in around the hovered or held band. */
 .duck-pad-hover:has([data-duck-region="attack"]:hover:not(.nav-virtual-pointer *)) .duck-pad-seam[data-duck-seam="0"],
@@ -202,7 +202,7 @@
 .random-pad-hover:has([data-random-region]:hover:not(.nav-virtual-pointer *)) .random-pad-seam,
 .nav-virtual-pointer .random-pad-hover:has([data-random-region].nav-available) .random-pad-seam,
 .random-pad-hover[data-random-held] .random-pad-seam { opacity: 1; }
-.duck-pad-ball { filter: drop-shadow(0 0 var(--lm-glow) currentColor); }
+.duck-pad-ball { filter: var(--lm-f-self); }
 .duck-pad-ball[data-off] { display: none; }
 .filter-pads-hover:has([data-filter-region]:hover:not(.nav-virtual-pointer *)) .filter-pads-seam,
 .nav-virtual-pointer .filter-pads-hover:has([data-filter-region].nav-available) .filter-pads-seam,
@@ -291,7 +291,7 @@
 .lfo-pad-hover[data-lfo-held="window"] .lfo-pad-seam[data-lfo-seam="1"] { opacity: 1; }
 /* Step sequencer: its cells and buttons (scale buttons and tonic keys included) are press marks, idle or lit (lm-on), and a
    lit cell under the playhead glows. The playhead hides while the sequencer is stopped. */
-.step-seq-cell[data-on][data-now] { filter: drop-shadow(0 0 var(--lm-glow) var(--lm-press-on-color)); }
+.step-seq-cell[data-on][data-now] { filter: var(--lm-f-on); }
 .step-seq-playhead[data-off] { display: none; }
 /* The swatch role (roles.js): a color group shown as itself, in its group's color (--lm-swatch-<group>, from the palette). */
 .lm-role-swatch { fill: var(--lm-well-color); stroke: var(--lm-divider-color); stroke-width: var(--lm-guide-stroke); pointer-events: auto; }
@@ -324,14 +324,15 @@
  * highlighted they take a tight Color 1 ring and a wide glow, and the same held look. Colors come only from the
  * component's tiers (roles.js TOUCH_STATES); these rules move size and glow. The cursor over a host is the `#cursor-dot`
  * (outside the component colors): big, bright, and glowing while free; while a grab holds it stands where it was as a
- * small dim ring. Tune every look here.
+ * small dim ring. Tune every look here, but the glows: a glow is an SVG filter written with its root (roles.js
+ * roleFilters, where the glows' sizes are; Safari applies no CSS filter function to a shape inside an SVG), which these
+ * rules only name (`--lm-f-dot`, `--lm-f-press`, …). The glow sizes below are the handbook's (runtime.css), the same numbers.
  */
 :root {
   --nav-idle-scale: .82;
   --nav-available-scale: 1.1; --nav-available-glow: 7px; --nav-available-glow-mix: 75%;
   --nav-held-scale: 1.18; --nav-held-glow: 9px; --nav-held-glow-mix: 90%;
-  --nav-press-available-glow: 8px; --nav-press-available-glow-mix: 85%; --nav-press-available-ring: 1.5px;
-  --nav-press-held-glow: 12px; --nav-press-held-glow-mix: 90%;
+  --nav-press-available-glow: 8px; --nav-press-available-glow-mix: 85%;
   /* The held cursor's dimming (it is outside the component colors, so it dims rather than blends). */
   --nav-cursor-held-opacity: .5;
   /* The cursor's color is the `cursor` role's group (roles.js COLOR_ROLES; a host sets --nav-cursor-color from it); its glow follows it. */
@@ -352,30 +353,27 @@
   transform: scale(var(--nav-idle-scale)); fill: transparent; stroke: var(--lm-handle-idle, var(--nav-glow-color)); filter: none;
 }
 /* A playing KFO's indicator travels its path: never idle, solid, and edged dark so it reads on any background. */
-.nav-host .component-live.motion-playing:not(.nav-available, .nav-held) { transform: none; filter: drop-shadow(0 0 1.5px var(--motion-playing-edge, rgba(0, 0, 0, .9))); }
+.nav-host .component-live.motion-playing:not(.nav-available, .nav-held) { transform: none; filter: var(--lm-f-playing); }
 .layout2-component-live .component-live.motion-playing, .nav-host .component-live.motion-playing { fill: var(--lm-handle); stroke: var(--lm-handle); stroke-width: calc(var(--lm-indicator-stroke) * 1.5); }
 .nav-host :is(.component-live, .mod-level-dot).nav-available {
   transform: scale(var(--nav-available-scale)); fill: var(--lm-handle-fill, var(--nav-glow-color)); stroke: var(--nav-glow-color);
-  filter: drop-shadow(0 0 var(--nav-available-glow) color-mix(in srgb, var(--nav-glow-color) var(--nav-available-glow-mix), transparent));
+  filter: var(--lm-f-dot);
 }
 .nav-host :is(.component-live, .mod-level-dot).nav-held {
   /* Under control a dot is solid: its fill matches its outline. */
   fill: var(--nav-glow-color); stroke: var(--nav-glow-color);
   transform: scale(var(--nav-held-scale));
-  filter: drop-shadow(0 0 var(--nav-held-glow) color-mix(in srgb, var(--nav-glow-color) var(--nav-held-glow-mix), transparent));
+  filter: var(--lm-f-dot-held);
 }
 
 /* Press targets: a recorder's Play, a pad's buttons and cells, mod mode's controls, the dialog's buttons. Idle they rest
    as their tier draws them (a press mark's resting fill); highlighted they take a tight Color 1 ring and a wide glow, held a
    stronger glow; let go, back to highlighted. Switched at once, like the dots. */
-.nav-host :is(.nav-press, .nav-available, .nav-held):not(.component-live):not(.mod-level-dot) {
-  --nav-glow-color: var(--lm-highlight-color, var(--accent-2));
-}
 .nav-host .nav-available:not(.component-live):not(.mod-level-dot) {
-  filter: drop-shadow(0 0 var(--nav-press-available-ring) var(--nav-glow-color)) drop-shadow(0 0 var(--nav-press-available-glow) color-mix(in srgb, var(--nav-glow-color) var(--nav-press-available-glow-mix), transparent));
+  filter: var(--lm-f-press);
 }
 .nav-host .nav-held:not(.component-live):not(.mod-level-dot) {
-  filter: drop-shadow(0 0 var(--nav-press-available-ring) var(--nav-glow-color)) drop-shadow(0 0 var(--nav-press-held-glow) color-mix(in srgb, var(--nav-glow-color) var(--nav-press-held-glow-mix), transparent));
+  filter: var(--lm-f-press-held);
 }
 
 /* The cursor over a host: the real one hidden, the dot in its place. While a grab holds without pointer lock, hidden everywhere. */
@@ -401,8 +399,7 @@
    rendered in the same markup (the card's component and, while a row is hovered, the components that play its
    modulators) — rendered, not added after, so a re-render never fades them in from bright; the floating Mod Card is drawn like the page, every mark in an element
    role at the card's unit. */
-:root { --mod-dim-filter: opacity(.22) saturate(.3); --mod-dim-ms: 120ms; }
-.layout2-sheet.mod-mode [data-owner-component-id] { filter: var(--mod-dim-filter); transition: filter var(--mod-dim-ms) ease; }
+.layout2-sheet.mod-mode [data-owner-component-id] { filter: url(#layout2-mod-dim); }
 /* The mod surface's aux pads (mod-surface.js) are never dimmed: they are on the surface, not the page under it. */
 .layout2-sheet.mod-mode .mod-band-sheet [data-owner-component-id] { filter: none; }
 /* Its window's outline (mod-surface.js renderModSurfaceUnderSvg): a ring in the highlight tier (Color 1) at the drawing stroke;
@@ -448,12 +445,12 @@
 .kfo-card .kfo-button.disabled { --lm-label-color: var(--lm-divider-color); --lm-glyph1-color: var(--lm-divider-color); --lm-symbol-color: var(--lm-divider-color); --lm-recording-color: var(--lm-divider-color); }
 /* The selected component's recording glow: its outline in the recording role, flashing while armed, steady while recording. */
 /* The same ring on a KFO in mod mode (mod-surface.js renderModKfoVeilSvg) while it is armed or recording. */
-.mod-callouts .mod-recording, .mod-surface .mod-recording, .mod-kfo-veil .mod-recording { fill: none; stroke: var(--lm-recording-color); filter: drop-shadow(0 0 var(--lm-glow) var(--lm-recording-color)); }
+.mod-callouts .mod-recording, .mod-surface .mod-recording, .mod-kfo-veil .mod-recording { fill: none; stroke: var(--lm-recording-color); filter: var(--lm-f-record); }
 .mod-callouts .mod-recording.armed, .mod-surface .mod-recording.armed, .mod-kfo-veil .mod-recording.armed { animation: motion-armed-blink .5s ease-in-out infinite alternate; }
 /* A KFO in mod mode picking its targets: its outline over its veil in the highlight tier (Color 1), with a slight glow. */
-.mod-kfo-veil .mod-kfo-outline { fill: none; stroke: var(--lm-highlight-color); stroke-width: var(--lm-highlight-stroke); filter: drop-shadow(0 0 var(--lm-glow) var(--lm-highlight-color)); }
+.mod-kfo-veil .mod-kfo-outline { fill: none; stroke: var(--lm-highlight-color); stroke-width: var(--lm-highlight-stroke); filter: var(--lm-f-outline); }
 /* A component the KFO drives a handle of (selected): the same glowing outline in the Record color. */
-.mod-kfo-veil .mod-kfo-outline.selected { stroke: var(--lm-recording-color); stroke-width: var(--lm-highlight-stroke); filter: drop-shadow(0 0 var(--lm-glow) var(--lm-recording-color)); }
+.mod-kfo-veil .mod-kfo-outline.selected { stroke: var(--lm-recording-color); stroke-width: var(--lm-highlight-stroke); filter: var(--lm-f-record); }
 /* A rotate button (mod-mode.js rotateButtonMarks: a KFO target's, a soloKFO pattern's): its quad or triangle outline in the same tier, without the glow. */
 .mod-card .kfo-target-shape { fill: none; stroke: var(--lm-highlight-color); stroke-width: var(--lm-highlight-stroke); }
 /* Its ghost dot (the start corner: which way is right side up): the dot's ring, hollow, in the same tier. */
