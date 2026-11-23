@@ -3,7 +3,7 @@
   "schemaVersion": 96,
   "name": "Ravakele",
   "createdAt": "2026-11-11T00:32:43.443Z",
-  "updatedAt": "2026-11-23T05:53:37.941Z",
+  "updatedAt": "2026-11-23T16:52:04.263Z",
   "pages": [
     {
       "id": "page_mwbdxcc2_pn3uw",
@@ -961,23 +961,8 @@
                     0,
                     0,
                     0,
-                    1,
                     0,
                     1,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    1,
-                    0,
-                    1,
-                    0,
-                    1,
-                    0,
-                    1,
-                    0,
                     0,
                     0,
                     0,
@@ -992,6 +977,21 @@
                     0,
                     0,
                     1,
+                    1,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    1,
+                    0,
+                    0,
                     0,
                     0
                   ],
@@ -5640,7 +5640,7 @@
     },
     "sheetGradient": {
       "mode": "concentric",
-      "motion": "highlight",
+      "motion": "off",
       "speed": 60,
       "follow": 1.6,
       "size": 1,
@@ -5743,7 +5743,7 @@
       "levels": [
         {
           "id": "level_mwbphn25_ack0j",
-          "name": "",
+          "name": "Welcome!",
           "text": "Welcome Aboard Captain!\n\nPress the \"Next\" button below.",
           "pageId": null,
           "open": [
@@ -5858,7 +5858,7 @@
         },
         {
           "id": "level_mwsqvtfr_8829h",
-          "name": "",
+          "name": "Navigation",
           "text": "If you are using a touchscreen, then the controls should feel natural. Tap to press. Hold to move a handle.",
           "pageId": null,
           "open": [
@@ -6064,12 +6064,12 @@
     },
     {
       "id": "world_mwcofhxb_gdf9o",
-      "name": "Frequency",
+      "name": "Frequency pt. 1",
       "patchName": null,
       "levels": [
         {
           "id": "level_mwqrbf0q_pzx4o",
-          "name": "",
+          "name": "Journey Into Sound",
           "text": "Let's begin our journey into sound design.\n\n",
           "pageId": null,
           "open": [
@@ -6389,7 +6389,7 @@
         {
           "id": "level_mws78cap_057u3",
           "name": "",
-          "text": "Use the speed slider to adjust how fast the sequence plays.",
+          "text": "Use the \"Speed\" slider to adjust how fast the sequence plays.",
           "pageId": null,
           "open": [
             "cell_mwbobxy5_cv4qa",
@@ -6455,7 +6455,7 @@
       "levels": [
         {
           "id": "level_mws7r1zx_vugkp",
-          "name": "",
+          "name": "Amplitude",
           "text": "Sound waves have two important properties: Frequency and Amplitude.",
           "pageId": null,
           "open": [
@@ -6575,7 +6575,7 @@
         },
         {
           "id": "level_mws7zq23_be34z",
-          "name": "",
+          "name": "Amp Slider",
           "text": "Here is a new panel that gives you another control over Amplitude.",
           "pageId": null,
           "open": [
@@ -6745,12 +6745,12 @@
     },
     {
       "id": "world_mws8waf1_ozf4w",
-      "name": "Semitones",
+      "name": "Frequency pt. 2",
       "patchName": null,
       "levels": [
         {
           "id": "level_mws8waf1_q8kzy",
-          "name": "",
+          "name": "Frequency",
           "text": "Let's turn our attention back to Frequency.",
           "pageId": null,
           "open": [
@@ -7112,7 +7112,7 @@
         },
         {
           "id": "level_mwsbpnwp_994h8",
-          "name": "",
+          "name": "XY Pad",
           "text": "Here is a new control panel. Instead of a slider, it is a XY pad. This allows you to control Frequency and Amplitude at the same time.",
           "pageId": null,
           "open": [
@@ -7211,7 +7211,7 @@
       "levels": [
         {
           "id": "level_mwsbj7c4_954w3",
-          "name": "",
+          "name": "Harmonics",
           "text": "The colors we see out in the world rarely match the \"pure\" colors of the rainbow.",
           "pageId": null,
           "open": [
@@ -7442,7 +7442,7 @@
         {
           "id": "level_mwscpags_65b0x",
           "name": "",
-          "text": "Synthesizers are all about designing your own sounds.",
+          "text": "However there are many tools that we can use to control the fundamental and harmonic frequencies produced by a synthesizer.",
           "pageId": null,
           "open": [
             "cell_mwbpebpm_7aa36",
@@ -7465,7 +7465,7 @@
         {
           "id": "level_mwsd2luf_vfcf8",
           "name": "",
-          "text": "So, in addition to the oscillator, this synthesizer also happens to have something called a Filter.",
+          "text": "So, in addition to the oscillator, this synthesizer happens to have something called a Filter.",
           "pageId": null,
           "open": [
             "cell_mwbpebpm_7aa36",
@@ -7560,6 +7560,54 @@
           "id": "level_mwsgzn3o_dx6fv",
           "name": "",
           "text": "Push play on the sequencer to see the incoming frequencies displayed.",
+          "pageId": null,
+          "open": [
+            "cell_mwbpebpm_7aa36",
+            "cell_mwbobc6o_1bvez",
+            "cell_mwbobxy5_cv4qa",
+            "cell_mwboc4xa_2j8ul",
+            "cell_mwbpe2nw_m91q5",
+            "cell_mwbobvma_u296d",
+            "cell_mwcceql2_5ffhf",
+            "cell_mws16wlk_bnjjj",
+            "cell_mwbpea2b_gk2m1",
+            "cell_mws4j4gs_u8n5j",
+            "cell_mwbpe06x_tt5uv",
+            "cell_mwbpcmcx_hmher",
+            "cell_mws8nx8d_tpfq1",
+            "cell_mwcceozo_3v5i8",
+            "cell_mwbo0ved_iwjip",
+            "cell_mwbo0wx0_iju7h"
+          ]
+        },
+        {
+          "id": "level_mwthsqjj_hhfb5",
+          "name": "",
+          "text": "The line that looks like the jagged peaks of a mountain range represents the various frequencies and how much amplitude they have.",
+          "pageId": null,
+          "open": [
+            "cell_mwbpebpm_7aa36",
+            "cell_mwbobc6o_1bvez",
+            "cell_mwbobxy5_cv4qa",
+            "cell_mwboc4xa_2j8ul",
+            "cell_mwbpe2nw_m91q5",
+            "cell_mwbobvma_u296d",
+            "cell_mwcceql2_5ffhf",
+            "cell_mws16wlk_bnjjj",
+            "cell_mwbpea2b_gk2m1",
+            "cell_mws4j4gs_u8n5j",
+            "cell_mwbpe06x_tt5uv",
+            "cell_mwbpcmcx_hmher",
+            "cell_mws8nx8d_tpfq1",
+            "cell_mwcceozo_3v5i8",
+            "cell_mwbo0ved_iwjip",
+            "cell_mwbo0wx0_iju7h"
+          ]
+        },
+        {
+          "id": "level_mwthty5c_6qk3n",
+          "name": "",
+          "text": "The largest peak on the left is the fundamental. The smaller peaks to the right are the harmonics.",
           "pageId": null,
           "open": [
             "cell_mwbpebpm_7aa36",
@@ -7678,7 +7726,7 @@
         },
         {
           "id": "level_mwsd6kji_ombpm",
-          "name": "",
+          "name": "Cutoff",
           "text": "Above the cutoff -> amplitude reduced\n\nNear the cutoff -> amplitude boosted\n\nBelow the cutoff -> amplitude preserved",
           "pageId": null,
           "open": [
@@ -7726,7 +7774,7 @@
         },
         {
           "id": "level_mwse8wqh_pvs02",
-          "name": "",
+          "name": "Metric Units",
           "text": "Quick metric unit recap:\nkilo = 1000\nHz = Hertz\nkHz = kiloHertz\n20 kHz = 20,000 Hertz",
           "pageId": null,
           "open": [
@@ -7822,7 +7870,7 @@
         },
         {
           "id": "level_mwseny1r_ad0ym",
-          "name": "",
+          "name": "Experiment #1",
           "text": "Set the controls to these settings: \n- cutoff to 20kHz\n- resonance to 0%\n- octave to 0\n- semitone to 0\n- amp to 1.00",
           "pageId": null,
           "open": [
@@ -7847,7 +7895,55 @@
         {
           "id": "level_mwseu33o_r00jg",
           "name": "",
-          "text": "Now play some notes and watch what frequencies are displayed in the filter.",
+          "text": "Now press play on the sequencer and use the XY Pad to adjust the amplitude and frequency.",
+          "pageId": null,
+          "open": [
+            "cell_mwbpebpm_7aa36",
+            "cell_mwbobc6o_1bvez",
+            "cell_mwbobxy5_cv4qa",
+            "cell_mwboc4xa_2j8ul",
+            "cell_mwbpe2nw_m91q5",
+            "cell_mwbobvma_u296d",
+            "cell_mwcceql2_5ffhf",
+            "cell_mws16wlk_bnjjj",
+            "cell_mwbpea2b_gk2m1",
+            "cell_mws4j4gs_u8n5j",
+            "cell_mwbpcmcx_hmher",
+            "cell_mws8nx8d_tpfq1",
+            "cell_mwcceozo_3v5i8",
+            "cell_mwbo0ved_iwjip",
+            "cell_mwbo0wx0_iju7h",
+            "cell_mwbpe06x_tt5uv"
+          ]
+        },
+        {
+          "id": "level_mwthxej2_jjq5d",
+          "name": "",
+          "text": "Pay attention to how the jagged peaks shift left right with changes to the semitones and octaves.\n\nAlso notice that the peaks grow or shrink depending on the amp settings of the oscillator BUT NOT the volume settings. ",
+          "pageId": null,
+          "open": [
+            "cell_mwbpebpm_7aa36",
+            "cell_mwbobc6o_1bvez",
+            "cell_mwbobxy5_cv4qa",
+            "cell_mwboc4xa_2j8ul",
+            "cell_mwbpe2nw_m91q5",
+            "cell_mwbobvma_u296d",
+            "cell_mwcceql2_5ffhf",
+            "cell_mws16wlk_bnjjj",
+            "cell_mwbpea2b_gk2m1",
+            "cell_mws4j4gs_u8n5j",
+            "cell_mwbpcmcx_hmher",
+            "cell_mws8nx8d_tpfq1",
+            "cell_mwcceozo_3v5i8",
+            "cell_mwbo0ved_iwjip",
+            "cell_mwbo0wx0_iju7h",
+            "cell_mwbpe06x_tt5uv"
+          ]
+        },
+        {
+          "id": "level_mwthzcp7_chcz7",
+          "name": "",
+          "text": "This is because the oscillator continues to send sound waves to the filter even if the amplifier at the end of the chain is turned all the way down.",
           "pageId": null,
           "open": [
             "cell_mwbpebpm_7aa36",
@@ -7870,8 +7966,8 @@
         },
         {
           "id": "level_mwsf0sh7_2j41j",
-          "name": "",
-          "text": "Keep exploring as much as you want.\n\nIf you need to revisit a topic, use the selector above to visit different levels.",
+          "name": "Explore!",
+          "text": "Keep exploring as much as you want.\n\nIf you need to revisit a topic, use the selector above to visit the different levels.",
           "pageId": null,
           "open": [
             "cell_mwbpebpm_7aa36",
@@ -7894,7 +7990,7 @@
         },
         {
           "id": "level_mwsf36kh_clp12",
-          "name": "",
+          "name": "Congrats!",
           "text": "Congrats! You've completed Ravakele: Journey Into Sound\n\nThe next part of your sound design adventure is Ravakele: Descent into Madness",
           "pageId": null,
           "open": [
@@ -7925,7 +8021,7 @@
       "levels": [
         {
           "id": "level_mwsi2hmh_i9ydn",
-          "name": "",
+          "name": "Setting Reset",
           "text": "Loading this World resets all the synthesizer settings back to their starting values.",
           "pageId": null,
           "open": [
@@ -7950,7 +8046,7 @@
       ]
     }
   ],
-  "level": "level_mwbphn25_ack0j",
+  "level": "level_mwsbgpr9_myscx",
   "palette": [
     {
       "color": "#ffffff",
