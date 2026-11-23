@@ -21358,6 +21358,7 @@ function createPlayer({ root, project: project3, library = null, sound = null, r
       return;
     const space = frame();
     fitPageToFrame(project3, page, space.width, space.height, { fill: true });
+    runtime.publishLookSources();
     const options = { ...runtime.renderOptions(), resolveUrl, editor: false, interactive: true, background: false };
     const areas = sheetHasFrame(page, project3);
     const mod = modHost.modActive();
@@ -21367,7 +21368,6 @@ function createPlayer({ root, project: project3, library = null, sound = null, r
     syncSheetMotion(root);
     modHost.bindModEvents(sheetElement());
     saveRoutes();
-    runtime.publishLookSources();
     runtime.publishIndicatorLook();
     ensureHandoff();
     handoff.markTargets();
