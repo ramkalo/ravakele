@@ -10393,8 +10393,18 @@ var TUNER_IDS = Object.freeze(["tuner_quad", "tuner_tri"]);
 var TUNER_PART = "util.tuner";
 var TUNER_A4 = 440;
 var TUNER_MIN_HZ = 48;
-var TUNER_MAX_HZ = 4200;
+var TUNER_MAX_HZ = 5000;
+var TUNER_SEARCH_HZ = 21000;
 var TUNER_THRESHOLD = 0.15;
+var FINE_STEPS = 8;
+var FINE_REACH = 32;
+var FINE_LAGS = 16;
+var FLAT = 0.1;
+var TUNER_MESSAGES = Object.freeze({
+  high: `Greater Than ${TUNER_MAX_HZ} Hz`,
+  low: `Less Than ${TUNER_MIN_HZ} Hz`,
+  unreadable: "Chord Error"
+});
 var TUNER_SILENCE = 0.001;
 var TUNER_UPDATE_MS = 100;
 var TUNER_HISTORY = 5;
@@ -10410,60 +10420,116 @@ function samplesOf(signal) {
     return Array.from(signal.left, (value, i) => (value + num(signal.right[i], 0)) / 2);
   return signal.left || signal;
 }
+function meanCrossings(samples, mean, band2) {
+  let side = 0, crossings = 0;
+  for (let i = 0;i < samples.length; i++) {
+    const now = samples[i] - mean > band2 ? 1 : samples[i] - mean < -band2 ? -1 : 0;
+    if (now && now !== side) {
+      if (side)
+        crossings += 1;
+      side = now;
+    }
+  }
+  return crossings;
+}
 function detectPitch(signal, sampleRate = num(signal?.sampleRate, SAMPLE_RATE)) {
   const samples = samplesOf(signal);
   if (!samples?.length || !(sampleRate > 0))
     return null;
   const maxLag = Math.min(Math.floor(sampleRate / TUNER_MIN_HZ), Math.floor(samples.length / 2));
-  const minLag = Math.max(2, Math.floor(sampleRate / TUNER_MAX_HZ));
-  if (maxLag <= minLag + 2)
+  if (maxLag <= FINE_LAGS + FINE_REACH)
     return null;
   const window2 = samples.length - maxLag;
   let energy = 0;
   for (let i = 0;i < samples.length; i++)
     energy += samples[i] * samples[i];
-  if (Math.sqrt(energy / samples.length) < TUNER_SILENCE)
+  const level = Math.sqrt(energy / samples.length);
+  if (level < TUNER_SILENCE)
     return null;
+  let mean = 0, spread = 0;
+  for (let i = 0;i < samples.length; i++)
+    mean += samples[i];
+  mean /= samples.length;
+  for (let i = 0;i < samples.length; i++)
+    spread += (samples[i] - mean) * (samples[i] - mean);
+  if (Math.sqrt(spread / samples.length) < level * FLAT)
+    return "low";
   const d = new Float64Array(maxLag + 1);
-  for (let lag2 = 1;lag2 <= maxLag; lag2++) {
+  for (let lag = 1;lag <= maxLag; lag++) {
     let sum = 0;
     for (let i = 0;i < window2; i++) {
-      const delta = samples[i] - samples[i + lag2];
+      const delta = samples[i] - samples[i + lag];
       sum += delta * delta;
     }
-    d[lag2] = sum;
+    d[lag] = sum;
   }
-  const cmnd = new Float64Array(maxLag + 1);
-  cmnd[0] = 1;
-  let running = 0;
-  for (let lag2 = 1;lag2 <= maxLag; lag2++) {
-    running += d[lag2];
-    cmnd[lag2] = running > 0 ? d[lag2] * lag2 / running : 1;
-  }
-  let lag = -1;
-  for (let at = minLag;at < maxLag; at++) {
-    if (cmnd[at] < TUNER_THRESHOLD) {
-      while (at + 1 < maxLag && cmnd[at + 1] < cmnd[at])
-        at++;
-      lag = at;
-      break;
+  const between = (lag) => {
+    const base = Math.floor(lag);
+    let sum = 0;
+    for (let k = base - FINE_REACH + 1;k <= base + FINE_REACH; k++) {
+      if (Math.abs(k) > maxLag)
+        continue;
+      const x = lag - k;
+      sum += d[Math.abs(k)] * (x === 0 ? 1 : Math.sin(Math.PI * x) / (Math.PI * x)) * (0.5 + 0.5 * Math.cos(Math.PI * x / FINE_REACH));
     }
-  }
-  if (lag < 0)
-    return null;
-  const bottom = (at) => {
-    const a = d[at - 1], b = d[at], c = d[at + 1], bend = a - 2 * b + c;
-    return at + (bend > 0 ? (a - c) / (2 * bend) : 0);
+    return sum;
   };
-  const rough = bottom(lag);
-  const periods = Math.floor((maxLag - 2) / rough);
-  let far = Math.round(rough * periods);
-  for (let at = Math.max(2, far - 2);at <= Math.min(maxLag - 1, far + 2); at++)
-    if (d[at] < d[far])
-      far = at;
-  const period = periods > 1 ? bottom(far) / periods : rough;
+  const step = 1 / FINE_STEPS;
+  const bottom = (lag) => {
+    const a = between(lag - step), b = between(lag), c = between(lag + step), bend = a - 2 * b + c;
+    return lag + (bend > 0 ? step * (a - c) / (2 * bend) : 0);
+  };
+  const normalized = (row) => {
+    const cmnd = new Float64Array(row.length);
+    cmnd[0] = 1;
+    let running = 0;
+    for (let at2 = 1;at2 < row.length; at2++) {
+      running += row[at2];
+      cmnd[at2] = running > 0 ? row[at2] * at2 / running : 1;
+    }
+    return cmnd;
+  };
+  const firstDip = (cmnd, from) => {
+    for (let at2 = from;at2 < cmnd.length - 1; at2++) {
+      if (cmnd[at2] < TUNER_THRESHOLD) {
+        while (at2 + 1 < cmnd.length - 1 && cmnd[at2 + 1] < cmnd[at2])
+          at2++;
+        return at2;
+      }
+    }
+    return -1;
+  };
+  const fine2 = Float64Array.from({ length: FINE_LAGS * FINE_STEPS + 1 }, (_, at2) => Math.max(0, between(at2 * step)));
+  let at = firstDip(normalized(fine2), Math.ceil(sampleRate / TUNER_SEARCH_HZ * FINE_STEPS));
+  if (at >= fine2.length - 2)
+    at = -1;
+  let period = at < 0 ? 0 : bottom(at * step);
+  if (at < 0) {
+    at = firstDip(normalized(d), FINE_LAGS - 1);
+    if (at < 0)
+      return meanCrossings(samples, mean, level * FLAT) <= Math.ceil(2 * TUNER_MIN_HZ * samples.length / sampleRate) ? "low" : "unreadable";
+    const a = d[at - 1], b = d[at], c = d[at + 1], bend = a - 2 * b + c;
+    period = at + (bend > 0 ? (a - c) / (2 * bend) : 0);
+  }
+  const refine = (count) => {
+    const target = period * count, span = Math.min(1, period / 3);
+    let best = target, lowest = Infinity;
+    for (let lag = target - span;lag <= target + span; lag += step) {
+      const value = between(lag);
+      if (value < lowest) {
+        lowest = value;
+        best = lag;
+      }
+    }
+    period = bottom(best) / count;
+  };
+  const periods = Math.floor((maxLag - FINE_REACH) / period);
+  for (let count = 2;count < periods; count *= 2)
+    refine(count);
+  if (periods > 1)
+    refine(periods);
   const hz = sampleRate / period;
-  return hz >= TUNER_MIN_HZ && hz <= TUNER_MAX_HZ ? hz : null;
+  return hz > TUNER_MAX_HZ ? "high" : hz < TUNER_MIN_HZ ? "low" : hz;
 }
 function noteOf(hz, a4 = TUNER_A4) {
   const pitch = num(hz, 0), reference = num(a4, TUNER_A4) > 0 ? num(a4, TUNER_A4) : TUNER_A4;
@@ -10473,20 +10539,26 @@ function noteOf(hz, a4 = TUNER_A4) {
   const name = SEQ_TONIC_LABELS[(midi % 12 + 12) % 12];
   return { name, octave: Math.floor(midi / 12) - 1, midi, cents: (semitones - midi) * 100 };
 }
-function tunerReadouts(hz, a4 = TUNER_A4) {
-  const note = noteOf(hz, a4);
+function tunerReadouts(reading, a4 = TUNER_A4) {
+  if (TUNER_MESSAGES[reading])
+    return { note: "", cents: TUNER_MESSAGES[reading], hz: "" };
+  const note = noteOf(reading, a4);
   if (!note)
     return { note: "--", cents: "-- ct", hz: "-- Hz" };
   const cents = Math.round(note.cents) || 0;
-  return { note: `${note.name}${note.octave}`, cents: `${cents > 0 ? "+" : ""}${cents} ct`, hz: `${hz.toFixed(1)} Hz` };
+  return { note: `${note.name}${note.octave}`, cents: `${cents > 0 ? "+" : ""}${cents} ct`, hz: `${reading.toFixed(1)} Hz` };
 }
-function tunerSmooth(history, hz) {
-  const readings = [...history || [], Number.isFinite(hz) ? hz : null].slice(-TUNER_HISTORY);
-  const pitched = readings.filter((value) => value !== null).sort((a, b) => a - b);
-  if (pitched.length * 2 <= readings.length)
-    return { history: readings, hz: null };
+function tunerSmooth(history, reading) {
+  const readings = [...history || [], Number.isFinite(reading) || TUNER_MESSAGES[reading] ? reading : null].slice(-TUNER_HISTORY);
+  const most = (values) => values.length * 2 > readings.length;
+  const message = Object.keys(TUNER_MESSAGES).find((kind) => most(readings.filter((value) => value === kind)));
+  if (message)
+    return { history: readings, reading: message };
+  const pitched = readings.filter(Number.isFinite).sort((a, b) => a - b);
+  if (!most(pitched))
+    return { history: readings, reading: null };
   const middle2 = pitched.length >> 1;
-  return { history: readings, hz: pitched.length % 2 ? pitched[middle2] : (pitched[middle2 - 1] + pitched[middle2]) / 2 };
+  return { history: readings, reading: pitched.length % 2 ? pitched[middle2] : (pitched[middle2 - 1] + pitched[middle2]) / 2 };
 }
 function tunerLines(component) {
   const middle2 = MIDDLE[component?.corners?.length === 3 ? "triangle" : "quad"];
@@ -17139,8 +17211,8 @@ function createTuners({ project: project3, sound = null, root = globalThis.docum
   function advance(component, entry, a4) {
     const signal = sound?.on ? sound.spectrum?.(spectrumAddress(padBlock(entry, component))) : null;
     const before = kept.get(component.id);
-    const { history, hz } = tunerSmooth(before?.history, signal ? detectPitch(signal) : null);
-    const state = { history, words: hz === null ? before?.words || tunerReadouts(null) : tunerReadouts(hz, a4) };
+    const { history, reading } = tunerSmooth(before?.history, signal ? detectPitch(signal) : null);
+    const state = { history, words: reading === null ? before?.words || tunerReadouts(null) : tunerReadouts(reading, a4) };
     kept.set(component.id, state);
     return state.words;
   }
@@ -17559,6 +17631,187 @@ function createHandbookDialog({ project: project3, url = () => HANDBOOK_FILE, do
       load().then(() => draw());
   }
   return { open, close };
+}
+
+// library/runtime/prescreen.js
+var OVERLAY_ID3 = "lemnos-prescreen";
+var PRESCREEN_TEXT = "This tool is intended to be used on a bigger screen, such as a larger tablet, laptop, or desktop computer.";
+var SMALL_SCREEN_SIDE = 768;
+function normalizePrescreen(value) {
+  return { enabled: value?.enabled === true };
+}
+function smallScreen(screen = globalThis.screen) {
+  const width = Number(screen?.width), height = Number(screen?.height);
+  if (!(width > 0) || !(height > 0))
+    return false;
+  return Math.min(width, height) < SMALL_SCREEN_SIDE;
+}
+var sessionKey = (project3) => `lemnos-prescreen:${project3?.id ?? project3?.name ?? "synth"}`;
+function prescreenColors(project3) {
+  const design = project3?.design, palette = project3?.palette, group = (id) => slotCss(palette, groupSlot(design, id));
+  const mod = groundAlpha(design, "modAlpha") / 100, component = groundAlpha(design, "componentAlpha") / 100;
+  return {
+    "--prescreen-text": group(colorRole("text")),
+    "--prescreen-lines": group(colorRole("lines")),
+    "--prescreen-button": withOpacity(group(colorRole("componentGround")), component),
+    "--prescreen-card": withOpacity(group(colorRole("modCardGround")), mod),
+    "--prescreen-page": slotEntry(palette, groupSlot(design, colorRole("page"))).color
+  };
+}
+function createPrescreen({ project: project3, doc = () => globalThis.document, look = () => {}, screen = () => globalThis.screen, storage = () => globalThis.sessionStorage }) {
+  let overlay = null, onKey = null;
+  function shown() {
+    try {
+      return storage()?.getItem(sessionKey(project3())) === "1";
+    } catch {
+      return false;
+    }
+  }
+  function markShown() {
+    try {
+      storage()?.setItem(sessionKey(project3()), "1");
+    } catch {}
+  }
+  function close() {
+    if (!overlay)
+      return;
+    overlay.remove();
+    globalThis.removeEventListener?.("keydown", onKey, true);
+    overlay = null;
+    onKey = null;
+  }
+  function open() {
+    const document2 = doc();
+    if (!document2?.body)
+      return;
+    close();
+    look();
+    overlay = document2.createElement("div");
+    overlay.id = OVERLAY_ID3;
+    overlay.className = "lemnos-prescreen";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-label", "Small screen");
+    for (const [name, value] of Object.entries(prescreenColors(project3())))
+      overlay.style.setProperty(name, value);
+    overlay.innerHTML = `<div class="lemnos-prescreen-card"><p>${esc(PRESCREEN_TEXT)}</p><button type="button" data-prescreen="continue">Continue</button></div>`;
+    overlay.addEventListener("click", (event) => {
+      if (event.target.closest?.("[data-prescreen]"))
+        close();
+    });
+    overlay.addEventListener("pointerdown", (event) => event.stopPropagation());
+    onKey = (event) => event.stopPropagation();
+    globalThis.addEventListener?.("keydown", onKey, true);
+    document2.body.append(overlay);
+    overlay.querySelector?.("[data-prescreen]")?.focus?.();
+  }
+  function show() {
+    if (!normalizePrescreen(project3()?.design?.prescreen).enabled || !smallScreen(screen()) || shown())
+      return false;
+    markShown();
+    open();
+    return true;
+  }
+  return { show, open, close };
+}
+
+// library/runtime/update-check.js
+var OVERLAY_ID4 = "lemnos-update";
+var UPDATE_TEXT = "A newer version of this synth is available.";
+var VERSION_FILE = "version.json";
+var BUILD_META = "lemnos-build";
+var UPDATE_CHECK_MINUTES = 15;
+function normalizeUpdateCheck(value) {
+  return { enabled: value?.enabled === true };
+}
+var sessionKey2 = (project3) => `lemnos-update-dismissed:${project3?.id ?? project3?.name ?? "synth"}`;
+var pageBuild = (document2) => document2?.querySelector?.(`meta[name="${BUILD_META}"]`)?.getAttribute?.("content") || "";
+var publishedVersion = () => fetch(VERSION_FILE, { cache: "no-store" }).then((response) => response.ok ? response.json() : null);
+function createUpdateCheck({
+  project: project3,
+  doc = () => globalThis.document,
+  look = () => {},
+  save = () => {},
+  build = () => pageBuild(doc()),
+  fetchVersion = publishedVersion,
+  reload = () => globalThis.location?.reload(),
+  storage = () => globalThis.sessionStorage,
+  every = (run2, ms) => globalThis.setInterval?.(run2, ms)
+}) {
+  let overlay = null, started = false;
+  function dismissed() {
+    try {
+      return storage()?.getItem(sessionKey2(project3())) || "";
+    } catch {
+      return "";
+    }
+  }
+  function dismiss(latest) {
+    try {
+      storage()?.setItem(sessionKey2(project3()), latest);
+    } catch {}
+  }
+  function close() {
+    overlay?.remove();
+    overlay = null;
+  }
+  function show(latest = "") {
+    const document2 = doc();
+    if (!document2?.body)
+      return;
+    close();
+    look();
+    overlay = document2.createElement("div");
+    overlay.id = OVERLAY_ID4;
+    overlay.className = "lemnos-update";
+    overlay.setAttribute("role", "status");
+    for (const [name, value] of Object.entries(prescreenColors(project3())))
+      overlay.style.setProperty(name, value);
+    overlay.innerHTML = `<p>${esc(UPDATE_TEXT)}</p><div class="lemnos-update-buttons"><button type="button" data-update="later">Not now</button><button type="button" data-update="now">Update</button></div>`;
+    overlay.addEventListener("click", (event) => {
+      const choice2 = event.target.closest?.("[data-update]")?.getAttribute("data-update");
+      if (!choice2)
+        return;
+      close();
+      if (!latest)
+        return;
+      if (choice2 === "now") {
+        save();
+        reload();
+      } else
+        dismiss(latest);
+    });
+    overlay.addEventListener("pointerdown", (event) => event.stopPropagation());
+    document2.body.append(overlay);
+  }
+  async function check() {
+    const current = build();
+    if (!current)
+      return false;
+    let latest = "";
+    try {
+      latest = String((await fetchVersion())?.build || "");
+    } catch {
+      return false;
+    }
+    if (!latest || latest === current || latest === dismissed())
+      return false;
+    if (!overlay)
+      show(latest);
+    return true;
+  }
+  function start() {
+    if (started || !normalizeUpdateCheck(project3()?.design?.updateCheck).enabled || !build())
+      return false;
+    started = true;
+    check();
+    doc()?.addEventListener?.("visibilitychange", () => {
+      if (doc()?.visibilityState === "visible")
+        check();
+    });
+    every(() => check(), UPDATE_CHECK_MINUTES * 60000);
+    return true;
+  }
+  return { start, check, open: () => show(), close };
 }
 
 // library/ui/action.js
@@ -18709,6 +18962,8 @@ function createPageRuntime(options) {
   }
   const diagram = createDiagramDialog({ project: project3, library, doc: () => opt.doc });
   const handbook = createHandbookDialog({ project: project3, url: opt.handbookUrl, doc: () => opt.doc });
+  const prescreen = createPrescreen({ project: project3, doc: () => opt.doc, look: () => publishIndicatorLook() });
+  const updateCheck = createUpdateCheck({ project: project3, doc: () => opt.doc, look: () => publishIndicatorLook(), save: () => opt.persist() });
   const levels = createLevels({ project: project3, persist: () => opt.persist(), render: () => opt.render(), doc: () => opt.doc });
   function pageHooks({ switchPage, applyPalette: applyPalette2, patchRecalled } = {}) {
     return {
@@ -18782,7 +19037,7 @@ function createPageRuntime(options) {
   const tuners = createTuners({ project: project3, sound: opt.sound, root: opt.doc, host: padHost });
   const pitchKey = createPitchShiftKey({ project: project3, sound: opt.sound });
   const modWheel = createModWheel({ project: project3, library, sound: opt.sound, midiValues: () => midiIn.values });
-  return { renderOptions: renderOptions2, patchLive, patchPaxDisplays, followTwinsOnPage, pageRecorders, publishLookSources, publishIndicatorLook, setTarget, pageHooks, sendSound, kfoTargets, soloStore, motionRuntime, motionStateFor, motion: motion2, midi: midiIn, pitchKey, modWheel, levels, edgeLabels };
+  return { renderOptions: renderOptions2, patchLive, patchPaxDisplays, followTwinsOnPage, pageRecorders, publishLookSources, publishIndicatorLook, setTarget, pageHooks, sendSound, kfoTargets, soloStore, motionRuntime, motionStateFor, motion: motion2, midi: midiIn, pitchKey, modWheel, levels, edgeLabels, prescreen, updateCheck };
 }
 
 // library/runtime/palette-dialogs.js
@@ -20594,6 +20849,10 @@ function createCursorHandoff(options) {
   };
   const onPointerUp = (event) => {
     actionUp(`Mouse:${event.button}`);
+    if (event.pointerType === "touch") {
+      overHost = false;
+      refresh();
+    }
   };
   const onContextMenu = (event) => {
     if (suppressMenu) {
@@ -21146,6 +21405,8 @@ function createPlayer({ root, project: project3, library = null, sound = null, r
     fitFrame = requestAnimationFrame(() => draw());
   });
   draw();
+  runtime.prescreen.show();
+  runtime.updateCheck.start();
   return {
     showPage,
     draw,

@@ -3,7 +3,7 @@
   "schemaVersion": 96,
   "name": "Ravakele",
   "createdAt": "2026-11-11T00:32:43.443Z",
-  "updatedAt": "2026-11-23T01:04:53.971Z",
+  "updatedAt": "2026-11-23T04:08:16.839Z",
   "pages": [
     {
       "id": "page_mwbdxcc2_pn3uw",
@@ -2106,7 +2106,7 @@
                 "name": "Tuner · quad",
                 "blueprint": {
                   "id": "display.tuner-quad",
-                  "version": "1.2.0"
+                  "version": "1.3.0"
                 },
                 "shape": "quad",
                 "gesture": "display",
@@ -2687,7 +2687,7 @@
                   "end": 0.8,
                   "points": {
                     "level": {
-                      "x": 0.24931079802957393
+                      "x": 0.7535498936359984
                     }
                   },
                   "active": "level"
@@ -2700,7 +2700,7 @@
                 "valueNormalized": 0.5,
                 "gesturePosition": {
                   "x": 0.5,
-                  "y": 0.27254244915568715
+                  "y": 0.6176269212906389
                 },
                 "modMode": false,
                 "initialValue": 0,
@@ -5659,6 +5659,12 @@
       "veilAlpha": 0.8,
       "veilOutline": true,
       "veilOutlineWidth": 0.004
+    },
+    "prescreen": {
+      "enabled": false
+    },
+    "updateCheck": {
+      "enabled": false
     }
   },
   "labelStyles": [
@@ -5738,7 +5744,7 @@
         {
           "id": "level_mwbphn25_ack0j",
           "name": "",
-          "text": "Welcome Captain!\n\nPress the \"Next\" button below.",
+          "text": "Welcome Aboard Captain!\n\nPress the \"Next\" button below.",
           "pageId": null,
           "open": [
             "cell_mwbobc6o_1bvez",
@@ -5851,9 +5857,26 @@
           ]
         },
         {
+          "id": "level_mwsqvtfr_8829h",
+          "name": "",
+          "text": "If you are using a touchscreen, then the controls should feel natural. Tap to press. Hold to move a handle.",
+          "pageId": null,
+          "open": [
+            "cell_mwbobc6o_1bvez",
+            "cell_mwbobxy5_cv4qa",
+            "cell_mwboc4xa_2j8ul",
+            "cell_mwbobvma_u296d",
+            "cell_mwbpebpm_7aa36",
+            "cell_mwbpe2nw_m91q5",
+            "cell_mws16wlk_bnjjj",
+            "cell_mwbpea2b_gk2m1",
+            "cell_mwbpcmcx_hmher"
+          ]
+        },
+        {
           "id": "level_mwsidzyv_2kjmi",
           "name": "",
-          "text": "If you are using a mouse or touchpad, notice that you don't need to grab the handle on the slider directly. As long as the handle is highlighted you can \"click\" to grab.",
+          "text": "If you are using a mouse or touchpad, notice that you don't need to grab the handle on the slider directly. As long as the handle is highlighted you can click the mouse to \"grab\" the handle.",
           "pageId": null,
           "open": [
             "cell_mwbobc6o_1bvez",
@@ -5870,7 +5893,24 @@
         {
           "id": "level_mwsiib79_ogzcf",
           "name": "",
-          "text": "Alternatively, you can also use the spacebar on your keyboard to activate a \"grab\" or a \"press\" action.",
+          "text": "You can also use the spacebar on your keyboard to activate a \"grab\" or a \"press\" action.",
+          "pageId": null,
+          "open": [
+            "cell_mwbobc6o_1bvez",
+            "cell_mwbobxy5_cv4qa",
+            "cell_mwboc4xa_2j8ul",
+            "cell_mwbobvma_u296d",
+            "cell_mwbpebpm_7aa36",
+            "cell_mwbpe2nw_m91q5",
+            "cell_mws16wlk_bnjjj",
+            "cell_mwbpea2b_gk2m1",
+            "cell_mwbpcmcx_hmher"
+          ]
+        },
+        {
+          "id": "level_mwsqibfh_omf94",
+          "name": "",
+          "text": "My personal preference is to move with the mouse and \"grab\" or \"press\" with the spacebar.",
           "pageId": null,
           "open": [
             "cell_mwbobc6o_1bvez",
@@ -5887,7 +5927,24 @@
         {
           "id": "level_mwsikmoy_dh2ec",
           "name": "",
-          "text": "You also have several options for navigation. \n\nYou can use a mouse to navigate with a cursor.\n\nOr you can navigate with the arrow keys on a computer keyboard.",
+          "text": "But there are several other options for navigation.",
+          "pageId": null,
+          "open": [
+            "cell_mwbobc6o_1bvez",
+            "cell_mwbobxy5_cv4qa",
+            "cell_mwboc4xa_2j8ul",
+            "cell_mwbobvma_u296d",
+            "cell_mwbpebpm_7aa36",
+            "cell_mwbpe2nw_m91q5",
+            "cell_mws16wlk_bnjjj",
+            "cell_mwbpea2b_gk2m1",
+            "cell_mwbpcmcx_hmher"
+          ]
+        },
+        {
+          "id": "level_mwsqlo55_1l3nw",
+          "name": "",
+          "text": "You can continue using a mouse to navigate with a cursor.\n\nAlternatively, you can navigate with the arrow keys on a computer keyboard.",
           "pageId": null,
           "open": [
             "cell_mwbobc6o_1bvez",
@@ -5904,7 +5961,7 @@
         {
           "id": "level_mwsimfm2_vn2d6",
           "name": "",
-          "text": "If you are used to gaming controls, the WASD keys are also available for navigation.",
+          "text": "WASD keys also work.",
           "pageId": null,
           "open": [
             "cell_mwbobc6o_1bvez",
@@ -5921,7 +5978,7 @@
         {
           "id": "level_mwsipqt2_tgeg9",
           "name": "",
-          "text": "When navigating with the arrow keys or the WASD keys. You can use the spacebar to \"press\" buttons or \"grab\" handles.",
+          "text": "(If you're feeling adventurous you can also try using a game controller. I frequently use an Xbox controller for this.)",
           "pageId": null,
           "open": [
             "cell_mwbobc6o_1bvez",
@@ -5938,7 +5995,7 @@
         {
           "id": "level_mwsj5nak_fxtr7",
           "name": "",
-          "text": "While \"grabbing\" a slider handle with the spacebar, try using the arrow keys to adjust it's value.",
+          "text": "While \"grabbing\" a slider handle with the spacebar, try using the arrow keys to adjust it's value with more precision.",
           "pageId": null,
           "open": [
             "cell_mwbobc6o_1bvez",
@@ -7893,7 +7950,7 @@
       ]
     }
   ],
-  "level": "level_mwbphn25_ack0j",
+  "level": "level_mwsidzyv_2kjmi",
   "palette": [
     {
       "color": "#ffffff",
