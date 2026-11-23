@@ -3,7 +3,7 @@
   "schemaVersion": 96,
   "name": "Ravakele",
   "createdAt": "2026-11-11T00:32:43.443Z",
-  "updatedAt": "2026-11-23T04:08:16.839Z",
+  "updatedAt": "2026-11-23T04:18:42.153Z",
   "pages": [
     {
       "id": "page_mwbdxcc2_pn3uw",
@@ -5661,10 +5661,10 @@
       "veilOutlineWidth": 0.004
     },
     "prescreen": {
-      "enabled": false
+      "enabled": true
     },
     "updateCheck": {
-      "enabled": false
+      "enabled": true
     }
   },
   "labelStyles": [
