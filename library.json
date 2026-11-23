@@ -1,0 +1,4166 @@
+{
+  "parts": [
+    {
+      "schema": "lemnos-part/1",
+      "id": "amp.vca",
+      "version": "3.1.0",
+      "kind": "dsp",
+      "category": "amp",
+      "engine": "audio",
+      "stages": [
+        "voice",
+        "shared",
+        "global"
+      ],
+      "name": "VCA",
+      "summary": "The amp: stereo audio (everything wired into it, summed; a mono arrow feeds both channels) times Gain times a control signal, usually an envelope, through a linear-to-exponential Response, then balanced by Pan. One envelope arrow into it shapes every source mixed in, and both channels take the same gain, so the stereo field passes through; Pan 0 (the default) changes nothing.",
+      "tags": [
+        "amp",
+        "vca",
+        "gain",
+        "envelope",
+        "mixer"
+      ],
+      "favorite": false,
+      "runtime": "dsp",
+      "entry": "src/dsp/amp/Vca.hpp",
+      "tests": [
+        "test/dsp/vca.test.cpp"
+      ],
+      "ports": [
+        {
+          "id": "audio-in",
+          "name": "Audio in",
+          "kind": "audio",
+          "direction": "in",
+          "rate": "sample",
+          "channels": 2,
+          "description": "The stereo buffer (left, right), processed in place from offset for n samples. Every audio arrow into the block is summed into it first; a mono arrow feeds both channels."
+        },
+        {
+          "id": "cv",
+          "name": "Control in",
+          "kind": "control",
+          "direction": "in",
+          "rate": "sample",
+          "description": "Per-sample 0..1 (an envelope's process() output), one value per audio sample; null when nothing is wired, which is the same as 1."
+        },
+        {
+          "id": "params",
+          "name": "Gain, response, pan",
+          "kind": "control",
+          "direction": "in",
+          "rate": "block",
+          "description": "setParams(gain, response, pan) each block."
+        },
+        {
+          "id": "audio-out",
+          "name": "Audio out",
+          "kind": "audio",
+          "direction": "out",
+          "rate": "sample",
+          "channels": 2,
+          "description": "The same two channels after process(left, right, cv, offset, n): each · gain · vcaCurve(cv), one gain for both, then left · balanceGains(pan).l and right · balanceGains(pan).r."
+        }
+      ],
+      "host": "A host owns one Vca per voice, calls prepare(sampleRate), setParams each block, sums the audio of every block with an audio arrow into it into one stereo buffer pair (a mono source into both), then calls process(left, right, cv, offset, n) with cv the envelope's process() output for the same span (or null when no Modulation arrow points at the VCA).",
+      "notes": [
+        "Wiring in the Architecture chart: audio arrows from the sources into the VCA, one Modulation arrow from the envelope into it. The ADSR Pad's paths drive the envelope's attack, decay, sustain and release, not the VCA.",
+        "reset() jumps the level to its target with no glide, for a voice that starts silent.",
+        "It takes no velocity: route a Velocity source (mod.velocity) to Gain for notes that play louder when struck harder.",
+        "Pan places a mono source on the field (a chain still mono at the VCA, such as an oscillator through a mono filter, arrives as L = R)."
+      ],
+      "perf": {
+        "cpu": "One multiply per sample, plus one exp() per sample when cv is wired."
+      },
+      "root": "dsp",
+      "manifestPath": "library/parts/dsp/amp.vca.json",
+      "purpose": "The amp: a voice's audio times Gain times its control signal (an envelope, usually), so one envelope shapes\neverything that is mixed into it.\n\nGain     — the level, 0..1, glided over GAIN_SMOOTH_MS so a jump does not click.\nResponse — how the control signal maps to gain: 0 linear, 1 exponential (vcaCurve), blended between.\nPan      — −1 (left) … +1 (right), a balance (balanceGains in util/pan.hpp): the middle keeps both sides at 1, a side\n           turns the other down to 0. So 0, the default, changes nothing, and a mono source (L = R) is panned with\n           its middle at full level. Glided over GAIN_SMOOTH_MS. The stereo process() only.\n\nNo allocation after construction.",
+      "parameters": [
+        {
+          "id": "gain",
+          "name": "Gain",
+          "kind": "float",
+          "min": 0,
+          "max": 1,
+          "default": 0.8,
+          "taper": "linear",
+          "unit": "%",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "The level, glided over GAIN_SMOOTH_MS (5 ms)."
+        },
+        {
+          "id": "response",
+          "name": "Response",
+          "kind": "float",
+          "min": 0,
+          "max": 1,
+          "default": 0.5,
+          "taper": "linear",
+          "unit": "%",
+          "group": "main",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "vcaCurve(cv, response): 0 is linear, 1 exponential ((e^(k·cv) − 1) / (e^k − 1), k = VCA_EXP_K = 6.9, about 60 dB), blended between. cv 0 is always silence and cv 1 always full gain."
+        },
+        {
+          "id": "pan",
+          "name": "Pan",
+          "kind": "float",
+          "min": -1,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "A balance (balanceGains in util/pan.hpp), glided over GAIN_SMOOTH_MS: 0 keeps both sides at 1; toward −1 the right side turns down to 0, toward +1 the left. A mono source (both channels the same) is panned with its middle at full level; a stereo one is balanced."
+        }
+      ],
+      "api": [
+        "constexpr double GAIN_SMOOTH_MS",
+        "constexpr double VCA_EXP_K",
+        "inline double vcaCurve(double cv, double response)",
+        "class Vca",
+        "void prepare(double sampleRate)",
+        "void reset()",
+        "void setParams(double gain, double response = 0, double pan = 0)",
+        "void process(float* io, const float* cv, int offset, int n)",
+        "void process(float* left, float* right, const float* cv, int offset, int n)"
+      ],
+      "runtimeFacts": {
+        "language": "C++17, header-only: each module is one .hpp in namespace dsp. Include it; there is nothing to link.",
+        "allocation": "Everything is allocated in prepare(). Audio-path methods are marked DSP_NONBLOCKING (noexcept, and [[clang::nonblocking]] where the compiler has it): no allocation, locks, I/O or exceptions in them.",
+        "imports": "The C++ standard library and other files in library/dsp/src only. No platform API.",
+        "randomness": "No std::rand or random_device; the seeded generator in src/dsp/util/random.hpp, so renders are reproducible.",
+        "state": "State lives in plain fields and fixed-size buffers. Every module exposes prepare / reset / process (or tick / render / advance).",
+        "sampleRate": "Any; passed to prepare(). Tests run at 48 kHz with 128-sample blocks.",
+        "target": "Any C++17 compiler. Each test is its own program (test/dsp/<name>.test.cpp); test.sh builds and runs them all.",
+        "dependencies": "None. The tests use the small harness in test/harness/."
+      },
+      "files": [
+        {
+          "path": "src/dsp/amp/Vca.hpp",
+          "role": "entry",
+          "sha256": "5318fa5ab97c7c754dbfed4d0f2e34a9cb244cb90aa856e93a90a57a372574f8",
+          "bytes": 3309
+        },
+        {
+          "path": "src/dsp/util/math.hpp",
+          "role": "dependency",
+          "sha256": "14af0cb7cab7efcf0492c5d2e53055e70eb67c696990985c369e35e7c04c8692",
+          "bytes": 1522
+        },
+        {
+          "path": "src/dsp/util/pan.hpp",
+          "role": "dependency",
+          "sha256": "8d2c8b8531f47b1fafe17b204cb633a6da840b9960e9fb6133a9ac01ffb5fb24",
+          "bytes": 1053
+        },
+        {
+          "path": "test/harness/check.hpp",
+          "role": "harness",
+          "sha256": "2b102af2a60300f7bfe71d363198988167c60828b15c007f5be0290e210c79b4",
+          "bytes": 4013
+        },
+        {
+          "path": "test/harness/signal.hpp",
+          "role": "harness",
+          "sha256": "6ed16d7e3bce367c2f71b641504bd6ddea63cbb8f9fde22c939430ff3a7dcd9f",
+          "bytes": 1182
+        },
+        {
+          "path": "test/dsp/vca.test.cpp",
+          "role": "test",
+          "sha256": "742d7f8fe0632951df2f025e84954965a9335be433e6632ed5562af528b567e8",
+          "bytes": 3691
+        }
+      ],
+      "bundleHash": "4ee5ab17ab3c744856d8618ed05b93e6550852b2e8c11044712c16d80b34506c"
+    },
+    {
+      "schema": "lemnos-part/1",
+      "id": "clock.tempo",
+      "version": "1.0.0",
+      "kind": "dsp",
+      "category": "clock",
+      "engine": "note",
+      "stages": [
+        "shared"
+      ],
+      "name": "Tempo",
+      "summary": "The synth's tempo: the one BPM every tempo-synced block follows (a step sequencer's steps, a synced LFO's cycle, a synced delay's time, an arpeggiator's division), and the clock source it is set to follow (Internal, Host or MIDI).",
+      "tags": [
+        "tempo",
+        "bpm",
+        "clock",
+        "sync"
+      ],
+      "favorite": false,
+      "runtime": "dsp",
+      "entry": "src/dsp/clock/Tempo.hpp",
+      "tests": [
+        "test/dsp/tempo.test.cpp"
+      ],
+      "ports": [
+        {
+          "id": "params",
+          "name": "Tempo, clock source",
+          "kind": "control",
+          "direction": "in",
+          "rate": "block",
+          "description": "setParams(tempo, clockSource) whenever a param changes."
+        },
+        {
+          "id": "tempo",
+          "name": "Tempo out",
+          "kind": "clock",
+          "direction": "out",
+          "rate": "block",
+          "channels": 1,
+          "description": "bpm(): the BPM every block with a Tempo input follows. No arrow is needed: a synth has one Tempo block and every Tempo input reads it."
+        }
+      ],
+      "host": "A synth owns one Tempo. Each block, the host hands bpm() to every tempo-synced block (StepSequencer::setParams, Lfo::setParams, WindowDelay::setParams, the arpeggiator's settings). With no Tempo block the tempo is TEMPO_DEFAULT_BPM (120). clockSource() says what the host should follow (0 Internal, 1 Host, 2 MIDI clock).",
+      "notes": [
+        "One per synth: a second Tempo block is left out.",
+        "The tempo is 30–300 BPM; setParams clamps it."
+      ],
+      "root": "dsp",
+      "manifestPath": "library/parts/dsp/clock.tempo.json",
+      "purpose": "The synth's tempo: the one BPM every tempo-synced block follows (a step sequencer's steps, a synced LFO's cycle, a\nsynced delay's time, an arpeggiator's division), and what it is set to follow.\n\nTempo — beats per minute, TEMPO_MIN_BPM..TEMPO_MAX_BPM. A synth with no Tempo block runs at TEMPO_DEFAULT_BPM.\nClock source — what the tempo and the transport follow: Internal (the Tempo param), Host (the plugin host's\n  transport) or MIDI (incoming MIDI clock, 24 per quarter note, with start, stop and continue).\n\nPure arithmetic; nothing allocates.",
+      "parameters": [
+        {
+          "id": "tempo",
+          "name": "Tempo",
+          "kind": "float",
+          "min": 30,
+          "max": 300,
+          "default": 120,
+          "taper": "linear",
+          "unit": "BPM",
+          "group": "main",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Beats per minute, for the whole synth. A bar is four beats."
+        },
+        {
+          "id": "clockSource",
+          "name": "Clock source",
+          "kind": "enum",
+          "min": 0,
+          "max": 2,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "main",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "enumLabels": [
+            "Internal",
+            "Host",
+            "MIDI"
+          ],
+          "note": "What tempo and transport follow: the Tempo param, the plugin host's transport, or incoming MIDI clock."
+        }
+      ],
+      "api": [
+        "constexpr double TEMPO_MIN_BPM",
+        "constexpr double TEMPO_MAX_BPM",
+        "constexpr double TEMPO_DEFAULT_BPM",
+        "constexpr int CLOCK_INTERNAL",
+        "constexpr int CLOCK_HOST",
+        "constexpr int CLOCK_MIDI",
+        "constexpr const char* CLOCK_SOURCE_LABELS[]",
+        "class Tempo",
+        "void setParams(double tempo, double clockSource)",
+        "double bpm() const",
+        "int clockSource() const"
+      ],
+      "runtimeFacts": {
+        "language": "C++17, header-only: each module is one .hpp in namespace dsp. Include it; there is nothing to link.",
+        "allocation": "Everything is allocated in prepare(). Audio-path methods are marked DSP_NONBLOCKING (noexcept, and [[clang::nonblocking]] where the compiler has it): no allocation, locks, I/O or exceptions in them.",
+        "imports": "The C++ standard library and other files in library/dsp/src only. No platform API.",
+        "randomness": "No std::rand or random_device; the seeded generator in src/dsp/util/random.hpp, so renders are reproducible.",
+        "state": "State lives in plain fields and fixed-size buffers. Every module exposes prepare / reset / process (or tick / render / advance).",
+        "sampleRate": "Any; passed to prepare(). Tests run at 48 kHz with 128-sample blocks.",
+        "target": "Any C++17 compiler. Each test is its own program (test/dsp/<name>.test.cpp); test.sh builds and runs them all.",
+        "dependencies": "None. The tests use the small harness in test/harness/."
+      },
+      "files": [
+        {
+          "path": "src/dsp/clock/Tempo.hpp",
+          "role": "entry",
+          "sha256": "bc95395a0f0f1cc26b6062a27e56c1666f009b43e1bb185d45bab708a699704e",
+          "bytes": 1471
+        },
+        {
+          "path": "src/dsp/util/math.hpp",
+          "role": "dependency",
+          "sha256": "14af0cb7cab7efcf0492c5d2e53055e70eb67c696990985c369e35e7c04c8692",
+          "bytes": 1522
+        },
+        {
+          "path": "test/harness/check.hpp",
+          "role": "harness",
+          "sha256": "2b102af2a60300f7bfe71d363198988167c60828b15c007f5be0290e210c79b4",
+          "bytes": 4013
+        },
+        {
+          "path": "test/dsp/tempo.test.cpp",
+          "role": "test",
+          "sha256": "49bb321661feef72813f7e4baf8fa8dc9cb997b5da22e4a745e8e84d2a902ec0",
+          "bytes": 674
+        }
+      ],
+      "bundleHash": "1c993bfbe395b30d86bd7e67141b02c54d37bb221a0cb76fe8f5a73590677dfa"
+    },
+    {
+      "schema": "lemnos-part/1",
+      "id": "env.envelope",
+      "version": "2.1.4",
+      "kind": "dsp",
+      "category": "env",
+      "engine": "modulation",
+      "stages": [
+        "global",
+        "voice",
+        "shared"
+      ],
+      "name": "Envelope",
+      "summary": "A six-stage envelope (Delay, Attack, Hold, Decay, Sustain, Release) with exponential Attack, Decay and Release curves, a Sustain curve that wobbles the plateau, and Intensity; with Delay and Hold at their minimum it is an ADSR.",
+      "tags": [
+        "envelope",
+        "adsr",
+        "dahdsr",
+        "modulation-source"
+      ],
+      "favorite": false,
+      "modSource": "env",
+      "runtime": "dsp",
+      "entry": "src/dsp/env/Envelope.hpp",
+      "tests": [
+        "test/dsp/envelope.test.cpp"
+      ],
+      "ports": [
+        {
+          "id": "gate",
+          "name": "Note on / off",
+          "kind": "event",
+          "direction": "in",
+          "rate": "block",
+          "description": "noteOn() starts from Delay (a retrigger while sounding holds and attacks from the current level, so the output never steps); noteOff() releases from the current level, wobble included."
+        },
+        {
+          "id": "params",
+          "name": "Times, levels, curves",
+          "kind": "control",
+          "direction": "in",
+          "rate": "block",
+          "description": "setParams(delay, attack, hold, decay, sustain, release, attackCurve, decayCurve, releaseCurve, sustainCurve, intensity) each block; a curve table is rebaked only when that curve changed."
+        },
+        {
+          "id": "out",
+          "name": "Envelope out",
+          "kind": "control",
+          "direction": "out",
+          "rate": "sample",
+          "description": "process(out, offset, n) writes per-sample values 0..intensity; advance(n) steps a block and returns the value there (for a block-rate modulation source); isFinished() once the release ends."
+        }
+      ],
+      "host": "A host owns one Envelope per voice and use (noteOn()/noteOff() from that voice's gate) or one for the whole instrument (noteOn() on the first key and, with Voice allocation's Trigger on Retrigger, on every new key; noteOff() when the last key is let go). It calls prepare(sampleRate), setParams each block, then process() (an amp envelope) or advance() (a modulation source).",
+      "notes": [
+        "Stage times are counted in samples (at least 1), so the stage machine is sample-accurate in both process() and advance().",
+        "An ADSR (the ADSR Pad's four paths) is this envelope with Delay and Hold left at their minimum."
+      ],
+      "perf": {
+        "cpu": "One table read per sample; a curve rebake (129 exp()) only when a curve moves."
+      },
+      "root": "dsp",
+      "manifestPath": "library/parts/dsp/env.envelope.json",
+      "purpose": "Six-stage envelope: Delay, Attack, Hold, Decay, Sustain, Release.\n\nDelay, Attack, Hold, Decay, Release — stage times in seconds, STAGE_MIN..STAGE_MAX.\nSustain     — the plateau's level, 0..1. A change while a note sounds glides there over SUSTAIN_SMOOTH_MS, so a\n              moved sustain never steps the level it shapes.\nAttack, Decay and Release curves — 0 (linear) to 1 (the most exponential); every stage bows below its straight\n              line: the attack rises slowly, then steeply; the decay and the release fall fast, then tail off. Each\n              is baked into its own small table when it moves (envelopeCurves.hpp).\nSustain curve — 0..1: as it rises the sustain plateau wobbles more, a triangle from 1 Hz to 20 Hz and from nothing\n              to ±10% of full level. Attack still covers the whole 0..1; only the plateau moves.\nIntensity   — scales the whole output, 0..1.\n\nAn ADSR is this envelope with Delay and Hold at STAGE_MIN.\n\nNo allocation after construction; setParams() is block-rate and rebakes a curve table only when that curve changed.",
+      "parameters": [
+        {
+          "id": "delay",
+          "name": "Delay",
+          "kind": "float",
+          "min": 0.001,
+          "max": 20,
+          "default": 0.001,
+          "taper": "cube",
+          "unit": "s",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "Silence before the attack."
+        },
+        {
+          "id": "attack",
+          "name": "Attack",
+          "kind": "float",
+          "min": 0.001,
+          "max": 20,
+          "default": 0.005,
+          "taper": "cube",
+          "unit": "s",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "0 to full level."
+        },
+        {
+          "id": "hold",
+          "name": "Hold",
+          "kind": "float",
+          "min": 0.001,
+          "max": 20,
+          "default": 0.001,
+          "taper": "cube",
+          "unit": "s",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "At full level before the decay."
+        },
+        {
+          "id": "decay",
+          "name": "Decay",
+          "kind": "float",
+          "min": 0.001,
+          "max": 20,
+          "default": 0.25,
+          "taper": "cube",
+          "unit": "s",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "Full level down to the sustain."
+        },
+        {
+          "id": "sustain",
+          "name": "Sustain",
+          "kind": "float",
+          "min": 0,
+          "max": 1,
+          "default": 0.7,
+          "taper": "amp",
+          "unit": "amp",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "The plateau's level while the note is held."
+        },
+        {
+          "id": "release",
+          "name": "Release",
+          "kind": "float",
+          "min": 0.001,
+          "max": 20,
+          "default": 0.3,
+          "taper": "cube",
+          "unit": "s",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "From wherever the envelope is at note-off down to 0."
+        },
+        {
+          "id": "attackCurve",
+          "name": "Attack curve",
+          "kind": "float",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "0 linear, 1 the most exponential: a slow start, then steeply up, (e^{6·c·p} − 1)/(e^{6·c} − 1)."
+        },
+        {
+          "id": "decayCurve",
+          "name": "Decay curve",
+          "kind": "float",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "0 linear, 1 the most exponential: the fall from full to sustain is fast, then tails off (the attack's shape at −c)."
+        },
+        {
+          "id": "releaseCurve",
+          "name": "Release curve",
+          "kind": "float",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "0 linear, 1 the most exponential: falls fast, then tails off to 0 (the attack's shape at −c)."
+        },
+        {
+          "id": "sustainCurve",
+          "name": "Sustain curve",
+          "kind": "float",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "How much the plateau wobbles: a triangle from nothing at 1 Hz to ±10% of full level at 20 Hz (exponential)."
+        },
+        {
+          "id": "intensity",
+          "name": "Intensity",
+          "kind": "float",
+          "min": 0,
+          "max": 1,
+          "default": 1,
+          "taper": "amp",
+          "unit": "amp",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "Scales the whole output."
+        }
+      ],
+      "api": [
+        "constexpr double STAGE_MIN",
+        "constexpr double STAGE_MAX",
+        "constexpr double SUSTAIN_SMOOTH_MS",
+        "constexpr double SUSTAIN_WIGGLE_DEPTH",
+        "constexpr double SUSTAIN_WIGGLE_HZ_MIN",
+        "constexpr double SUSTAIN_WIGGLE_HZ_MAX",
+        "enum EgStage : int { Idle = 0, Delay = 1, Attack = 2, Hold = 3, Decay = 4, Sustain = 5, Release = 6 }",
+        "class Envelope",
+        "void prepare(double sampleRate)",
+        "void reset()",
+        "void setParams(double delay, double attack, double hold, double decay, double sustain, double release, double attackCurve = 0, double decayCurve = 0, double releaseCurve = 0, double sustainCurve = 0, double intensity = 1)",
+        "void noteOn()",
+        "void noteOff()",
+        "bool isActive() const",
+        "bool isFinished() const",
+        "int currentStage() const",
+        "double stageProgress() const",
+        "double value() const",
+        "void process(float* out, int offset, int n)",
+        "double advance(int n)"
+      ],
+      "runtimeFacts": {
+        "language": "C++17, header-only: each module is one .hpp in namespace dsp. Include it; there is nothing to link.",
+        "allocation": "Everything is allocated in prepare(). Audio-path methods are marked DSP_NONBLOCKING (noexcept, and [[clang::nonblocking]] where the compiler has it): no allocation, locks, I/O or exceptions in them.",
+        "imports": "The C++ standard library and other files in library/dsp/src only. No platform API.",
+        "randomness": "No std::rand or random_device; the seeded generator in src/dsp/util/random.hpp, so renders are reproducible.",
+        "state": "State lives in plain fields and fixed-size buffers. Every module exposes prepare / reset / process (or tick / render / advance).",
+        "sampleRate": "Any; passed to prepare(). Tests run at 48 kHz with 128-sample blocks.",
+        "target": "Any C++17 compiler. Each test is its own program (test/dsp/<name>.test.cpp); test.sh builds and runs them all.",
+        "dependencies": "None. The tests use the small harness in test/harness/."
+      },
+      "files": [
+        {
+          "path": "src/dsp/env/Envelope.hpp",
+          "role": "entry",
+          "sha256": "8a50ef9e3896ad715e400f892b4c126f6e793e6d1320413eaeba17a03aa32f79",
+          "bytes": 9727
+        },
+        {
+          "path": "src/dsp/env/envelopeCurves.hpp",
+          "role": "dependency",
+          "sha256": "2347590fd0f8ed3bc5748934ab1d1aeb52f005196f53a032a3c92e1849782957",
+          "bytes": 2627
+        },
+        {
+          "path": "src/dsp/util/math.hpp",
+          "role": "dependency",
+          "sha256": "14af0cb7cab7efcf0492c5d2e53055e70eb67c696990985c369e35e7c04c8692",
+          "bytes": 1522
+        },
+        {
+          "path": "test/harness/check.hpp",
+          "role": "harness",
+          "sha256": "2b102af2a60300f7bfe71d363198988167c60828b15c007f5be0290e210c79b4",
+          "bytes": 4013
+        },
+        {
+          "path": "test/harness/signal.hpp",
+          "role": "harness",
+          "sha256": "6ed16d7e3bce367c2f71b641504bd6ddea63cbb8f9fde22c939430ff3a7dcd9f",
+          "bytes": 1182
+        },
+        {
+          "path": "test/dsp/envelope.test.cpp",
+          "role": "test",
+          "sha256": "b8f26d9275a4b93ff3c7ff5631f89cc9bd870d25314523b247e2d0034cf4c0d9",
+          "bytes": 10135
+        }
+      ],
+      "bundleHash": "07b2d2e6af94d32913798f373925692b29a1ffd368a2ce18cd43d09734519db6"
+    },
+    {
+      "schema": "lemnos-part/1",
+      "id": "filter.morph",
+      "version": "3.0.1",
+      "kind": "dsp",
+      "category": "filter",
+      "engine": "audio",
+      "stages": [
+        "voice",
+        "shared",
+        "global"
+      ],
+      "name": "Morph filter",
+      "summary": "A state-variable filter cascade whose one Shape control morphs LP 8p → LP 4p → LP 2p → LP Shelf → BP → HP Shelf → HP 2p → HP 4p → HP 8p → Notch, with Cutoff, Resonance on the last stage only, and Level.",
+      "tags": [
+        "filter",
+        "svf",
+        "morph",
+        "lowpass",
+        "highpass",
+        "bandpass",
+        "notch",
+        "shelf"
+      ],
+      "favorite": false,
+      "runtime": "dsp",
+      "entry": "src/dsp/filter/MorphFilter.hpp",
+      "tests": [
+        "test/dsp/morph-filter.test.cpp"
+      ],
+      "ports": [
+        {
+          "id": "in",
+          "name": "Audio in",
+          "kind": "audio",
+          "direction": "in",
+          "rate": "sample",
+          "channels": 1,
+          "description": "One buffer, filtered in place by process(buf, offset, n); tick(x) runs one sample without the level."
+        },
+        {
+          "id": "params",
+          "name": "Shape, cutoff, resonance, level",
+          "kind": "control",
+          "direction": "in",
+          "rate": "block",
+          "description": "setParams(shape, cutoffHz, resonance, level) each block; process() glides to it across the block."
+        },
+        {
+          "id": "out",
+          "name": "Audio out",
+          "kind": "audio",
+          "direction": "out",
+          "rate": "sample",
+          "channels": 1,
+          "description": "The same buffer: the weighted sum of two taps read at the running stages, times the level."
+        }
+      ],
+      "host": "A host owns one MorphFilter per voice, calls prepare(sampleRate), setParams(shape, cutoff, resonance, level) each block (with any modulation already applied to the values), then process(buf, offset, n). reset() on a voice's note-on if it should start from rest.",
+      "notes": [
+        "Stages are Butterworth-aligned (BUTTERWORTH_K), so cutoff is the −3 dB point at every order.",
+        "Coefficients and tap weights are computed at block rate and glided per sample; crossing a stop snaps the taps silently, and stages that stop running are cleared.",
+        "The Filter pads draw this filter's exact response: library/ui/filter-pads.js computes the same morph and gain (src/shared/filter-response-parity.test.js)."
+      ],
+      "perf": {
+        "cpu": "Up to four SVF stages per sample; one tan() per block."
+      },
+      "root": "dsp",
+      "manifestPath": "library/parts/dsp/filter.morph.json",
+      "purpose": "The morph filter: a cascade of up to four topology-preserving state-variable\nstages whose one Shape control morphs\n\n  LP 8p → LP 4p → LP 2p → LP Shelf → BP → HP Shelf → HP 2p → HP 4p\n  → HP 8p → Notch\n\nShape     — 0..SHAPE_MAX; whole numbers are the stops, a fraction blends\n            its two neighbours (filterMorphMath.hpp).\nCutoff    — 20 Hz..20 kHz.\nResonance — 0..1, on the last stage only, so there is one peak at cutoff\n            whatever the order.\nLevel     — the output gain, 0..1.\n\nStages are Butterworth-aligned rather than identical, so cutoff is the\n−3 dB point at every order. What the cascade is at any moment is a\nMorphState: how many stages run, what each feeds the next, and three taps (a\nresponse read at a stage) whose weighted sum is the output.\n\nsetParams() is block-rate. process() glides the coefficients and tap\nweights from the last block's setting to this one across the block, so\nsweeps don't zipper. When a block moves the taps to other stages (crossing\na stop) the weights snap rather than glide — the outgoing tap is at nothing\nand the incoming at unity there, so the snap is silent — and stages that\nstop running are cleared, so they resume from rest.",
+      "parameters": [
+        {
+          "id": "shape",
+          "name": "Shape",
+          "kind": "float",
+          "min": 0,
+          "max": 9,
+          "default": 2,
+          "taper": "linear",
+          "unit": "",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "enumLabels": [
+            "LP 8p",
+            "LP 4p",
+            "LP 2p",
+            "LP Shelf",
+            "BP",
+            "HP Shelf",
+            "HP 2p",
+            "HP 4p",
+            "HP 8p",
+            "Notch"
+          ],
+          "note": "Whole numbers are the stops; a fraction blends its two neighbours (morphInto in filterMorphMath.hpp). The shelves cross-fade with the bandpass between them; the notch is last."
+        },
+        {
+          "id": "cutoff",
+          "name": "Cutoff",
+          "kind": "float",
+          "min": 20,
+          "max": 20000,
+          "default": 20000,
+          "taper": "exp",
+          "unit": "Hz",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "The −3 dB point at every lowpass and highpass stop; the peak of the bandpass and the null of the notch."
+        },
+        {
+          "id": "resonance",
+          "name": "Resonance",
+          "kind": "float",
+          "min": 0,
+          "max": 1,
+          "default": 0.1,
+          "taper": "linear",
+          "unit": "%",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "On the last stage only, so there is one peak at cutoff whatever the order; at 1 the stage is close to self-oscillation."
+        },
+        {
+          "id": "level",
+          "name": "Level",
+          "kind": "float",
+          "min": 0,
+          "max": 1,
+          "default": 1,
+          "taper": "amp",
+          "unit": "amp",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "The output gain, smoothed over 10 ms."
+        }
+      ],
+      "api": [
+        "constexpr double CUTOFF_MIN_HZ",
+        "constexpr double CUTOFF_MAX_HZ",
+        "class MorphFilter",
+        "void prepare(double sampleRate)",
+        "void reset()",
+        "void setParams(double shape, double cutoffHz, double resonance, double level = 1)",
+        "void process(float* buf, int offset, int n)",
+        "double tick(double x)",
+        "void jump()"
+      ],
+      "runtimeFacts": {
+        "language": "C++17, header-only: each module is one .hpp in namespace dsp. Include it; there is nothing to link.",
+        "allocation": "Everything is allocated in prepare(). Audio-path methods are marked DSP_NONBLOCKING (noexcept, and [[clang::nonblocking]] where the compiler has it): no allocation, locks, I/O or exceptions in them.",
+        "imports": "The C++ standard library and other files in library/dsp/src only. No platform API.",
+        "randomness": "No std::rand or random_device; the seeded generator in src/dsp/util/random.hpp, so renders are reproducible.",
+        "state": "State lives in plain fields and fixed-size buffers. Every module exposes prepare / reset / process (or tick / render / advance).",
+        "sampleRate": "Any; passed to prepare(). Tests run at 48 kHz with 128-sample blocks.",
+        "target": "Any C++17 compiler. Each test is its own program (test/dsp/<name>.test.cpp); test.sh builds and runs them all.",
+        "dependencies": "None. The tests use the small harness in test/harness/."
+      },
+      "files": [
+        {
+          "path": "src/dsp/filter/MorphFilter.hpp",
+          "role": "entry",
+          "sha256": "813304a16d3f02e0f39249efbb2703312f8f914c3e1b4dd86e165cc15e647dd3",
+          "bytes": 8294
+        },
+        {
+          "path": "src/dsp/filter/filterMorphMath.hpp",
+          "role": "dependency",
+          "sha256": "2ce5b6964efb6b8800a509e0cf3e78e170982886262a106992a9da2d0269f6cf",
+          "bytes": 6552
+        },
+        {
+          "path": "src/dsp/util/math.hpp",
+          "role": "dependency",
+          "sha256": "14af0cb7cab7efcf0492c5d2e53055e70eb67c696990985c369e35e7c04c8692",
+          "bytes": 1522
+        },
+        {
+          "path": "test/harness/check.hpp",
+          "role": "harness",
+          "sha256": "2b102af2a60300f7bfe71d363198988167c60828b15c007f5be0290e210c79b4",
+          "bytes": 4013
+        },
+        {
+          "path": "test/harness/signal.hpp",
+          "role": "harness",
+          "sha256": "6ed16d7e3bce367c2f71b641504bd6ddea63cbb8f9fde22c939430ff3a7dcd9f",
+          "bytes": 1182
+        },
+        {
+          "path": "test/dsp/morph-filter.test.cpp",
+          "role": "test",
+          "sha256": "062b8c58ebb26b7e5c5f03b90935293a89588df0204584603be5dfc0c07a8ac6",
+          "bytes": 5912
+        }
+      ],
+      "bundleHash": "32802800791893c7fd9cb9bf78387fbff1744e202afc714d52ab1f847f16f001"
+    },
+    {
+      "schema": "lemnos-part/1",
+      "id": "fx.limiter",
+      "version": "1.0.0",
+      "kind": "dsp",
+      "category": "fx",
+      "engine": "audio",
+      "stages": [
+        "global",
+        "voice",
+        "shared"
+      ],
+      "name": "Limiter",
+      "summary": "A brick-wall lookahead peak limiter, stereo-linked: no sample leaves it past the Ceiling. Its output is LIMITER_LOOKAHEAD_MS (1.5 ms) late.",
+      "tags": [
+        "limiter",
+        "brick-wall",
+        "clipping",
+        "dynamics",
+        "stereo"
+      ],
+      "favorite": false,
+      "runtime": "dsp",
+      "entry": "src/dsp/fx/Limiter.hpp",
+      "tests": [
+        "test/dsp/limiter.test.cpp"
+      ],
+      "ports": [
+        {
+          "id": "audio-in",
+          "name": "Audio in",
+          "kind": "audio",
+          "direction": "in",
+          "rate": "sample",
+          "channels": 2,
+          "description": "left and right float buffers, processed in place from offset for n samples."
+        },
+        {
+          "id": "audio-out",
+          "name": "Audio out",
+          "kind": "audio",
+          "direction": "out",
+          "rate": "sample",
+          "channels": 2,
+          "description": "The same buffers, latency() samples late, never past the ceiling."
+        },
+        {
+          "id": "params",
+          "name": "Limiter",
+          "kind": "control",
+          "direction": "in",
+          "rate": "block",
+          "description": "setParams(input, ceiling, release) on a change; process(left, right, offset, n)."
+        }
+      ],
+      "host": "A host owns one Limiter on a stereo bus, calls prepare(sampleRate) off the audio thread, setParams on a change, then process(left, right, offset, n).",
+      "notes": [
+        "Stereo-linked: one gain for both channels, so the image does not shift.",
+        "Catches sample peaks, not peaks between samples.",
+        "prepare() allocates the delay and the windows; process() allocates nothing."
+      ],
+      "perf": {
+        "cpu": "A few compares and adds per sample; the attack window is re-summed once every 1.5 ms."
+      },
+      "root": "dsp",
+      "manifestPath": "library/parts/dsp/fx.limiter.json",
+      "purpose": "A brick-wall limiter: a lookahead peak limiter, stereo-linked, that never lets a sample past the Ceiling.\nThe signal is delayed by the lookahead (LIMITER_LOOKAHEAD_MS) while the gain is worked out ahead of it:\n\n  1. each sample's target gain: ceiling / peak (both channels' larger, after Input), or 1 under the ceiling;\n  2. hold: the lowest target over the last lookahead + 1 samples (a monotonic queue, O(1) a sample);\n  3. release: a rising gain eases back up (one pole, Release); a falling one follows at once;\n  4. attack: the mean of the last lookahead gains, so the gain glides down and reaches each peak's target as that\n     peak leaves the delay.\n\nEvery gain in the mean is at or under the target of the sample leaving the delay, so the output never passes the\nceiling; a last clamp at the ceiling covers rounding. It catches sample peaks, not peaks between samples.",
+      "parameters": [
+        {
+          "id": "input",
+          "name": "Input",
+          "kind": "float",
+          "min": 0,
+          "max": 24,
+          "default": 0,
+          "taper": "linear",
+          "unit": "dB",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "Gain into the limiter, glided over 10 ms: louder means more limiting."
+        },
+        {
+          "id": "ceiling",
+          "name": "Ceiling",
+          "kind": "float",
+          "min": -12,
+          "max": 0,
+          "default": -0.3,
+          "taper": "linear",
+          "unit": "dB",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "In dBFS: no output sample passes it."
+        },
+        {
+          "id": "release",
+          "name": "Release",
+          "kind": "float",
+          "min": 10,
+          "max": 1000,
+          "default": 100,
+          "taper": "exp",
+          "unit": "ms",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "The time constant of the gain coming back up after a peak."
+        }
+      ],
+      "api": [
+        "constexpr double LIMITER_LOOKAHEAD_MS",
+        "inline double limiterDbToGain(double db)",
+        "class Limiter",
+        "void prepare(double sampleRate)",
+        "void reset()",
+        "void setParams(double input, double ceiling, double release)",
+        "int latency() const",
+        "void process(float* left, float* right, int offset, int n)"
+      ],
+      "runtimeFacts": {
+        "language": "C++17, header-only: each module is one .hpp in namespace dsp. Include it; there is nothing to link.",
+        "allocation": "Everything is allocated in prepare(). Audio-path methods are marked DSP_NONBLOCKING (noexcept, and [[clang::nonblocking]] where the compiler has it): no allocation, locks, I/O or exceptions in them.",
+        "imports": "The C++ standard library and other files in library/dsp/src only. No platform API.",
+        "randomness": "No std::rand or random_device; the seeded generator in src/dsp/util/random.hpp, so renders are reproducible.",
+        "state": "State lives in plain fields and fixed-size buffers. Every module exposes prepare / reset / process (or tick / render / advance).",
+        "sampleRate": "Any; passed to prepare(). Tests run at 48 kHz with 128-sample blocks.",
+        "target": "Any C++17 compiler. Each test is its own program (test/dsp/<name>.test.cpp); test.sh builds and runs them all.",
+        "dependencies": "None. The tests use the small harness in test/harness/."
+      },
+      "files": [
+        {
+          "path": "src/dsp/fx/Limiter.hpp",
+          "role": "entry",
+          "sha256": "afb37fe4e8f5112899507ba6427305a2f4288cec5c8c882d193aca144d78ece2",
+          "bytes": 5465
+        },
+        {
+          "path": "src/dsp/util/math.hpp",
+          "role": "dependency",
+          "sha256": "14af0cb7cab7efcf0492c5d2e53055e70eb67c696990985c369e35e7c04c8692",
+          "bytes": 1522
+        },
+        {
+          "path": "test/harness/check.hpp",
+          "role": "harness",
+          "sha256": "2b102af2a60300f7bfe71d363198988167c60828b15c007f5be0290e210c79b4",
+          "bytes": 4013
+        },
+        {
+          "path": "test/harness/signal.hpp",
+          "role": "harness",
+          "sha256": "6ed16d7e3bce367c2f71b641504bd6ddea63cbb8f9fde22c939430ff3a7dcd9f",
+          "bytes": 1182
+        },
+        {
+          "path": "test/dsp/limiter.test.cpp",
+          "role": "test",
+          "sha256": "e2055af03bac42a01e17a7594b4fadecccfc7ad2045b18a969754a10d1759abb",
+          "bytes": 5026
+        }
+      ],
+      "bundleHash": "12135aff6093e003140c4752359763052316d13cacb1ba9a77183eafeee2a217"
+    },
+    {
+      "schema": "lemnos-part/1",
+      "id": "osc.wavetable",
+      "version": "2.2.1",
+      "kind": "dsp",
+      "category": "osc",
+      "engine": "audio",
+      "stages": [
+        "voice"
+      ],
+      "name": "Wavetable oscillator",
+      "summary": "A band-limited wavetable oscillator whose Shape morphs continuously Sine → Triangle → Saw → Square → Pulse (past Square the pulse narrows), with Width, Octave, Semitones and Cents of tuning from the played pitch, Level, and Phase reset.",
+      "tags": [
+        "oscillator",
+        "wavetable",
+        "morph",
+        "band-limited",
+        "pulse"
+      ],
+      "favorite": false,
+      "runtime": "dsp",
+      "unison": true,
+      "entry": "src/dsp/osc/WavetableOscillator.hpp",
+      "tests": [
+        "test/dsp/wavetable-oscillator.test.cpp"
+      ],
+      "ports": [
+        {
+          "id": "pitch",
+          "name": "Pitch",
+          "kind": "control",
+          "direction": "in",
+          "rate": "block",
+          "description": "setPitch(hz): the played pitch, glide, bend and pitch modulation included. The tuning params are applied on top (frequency())."
+        },
+        {
+          "id": "params",
+          "name": "Shape, width, tuning, level, phase reset",
+          "kind": "control",
+          "direction": "in",
+          "rate": "block",
+          "description": "setParams(shape, octave, semitones, cents, width, level, phaseReset) each block."
+        },
+        {
+          "id": "note-on",
+          "name": "Note on",
+          "kind": "event",
+          "direction": "in",
+          "rate": "block",
+          "description": "noteOn(sounding): restarts the phase under Phase reset Reset, or under From silence when the voice was silent (sounding false)."
+        },
+        {
+          "id": "out",
+          "name": "Audio out",
+          "kind": "audio",
+          "direction": "out",
+          "rate": "sample",
+          "channels": 1,
+          "description": "process(out, offset, n) writes n samples; the frequency glides across the block from the last block's."
+        }
+      ],
+      "host": "A host owns one WavetableOscillator per voice and oscillator, calls prepare(sampleRate) (the tables are built once per sample rate and shared), setPitch and setParams each block, noteOn(sounding) on a note-on (sounding: whether the voice's amp envelope had not finished), then process(out, offset, n).",
+      "notes": [
+        "One table per octave (mip), each holding only the harmonics below Nyquist for that octave; folded harmonics stay more than 40 dB below the fundamental up to G7.",
+        "The pulse is two saw reads offset by the width and subtracted: band-limited at any width, and in phase with the saw so the Saw → Square morph fills in.",
+        "tick(inc, pm, pwm) takes a phase-modulation offset in cycles; FmOperators (osc.fm-operators) uses it.",
+        "Takes unison (\"unison\": true): with a voice.unison block it plays that many copies, each detuned by its cents, summed into its mono output at 1/sqrt(count) (setUnison, adapters/UnisonCopies.hpp). Copies that start from a fixed phase start spread by the golden ratio."
+      ],
+      "perf": {
+        "cpu": "One or two table reads per sample (four in a Square blend); tables ≈ 180 KB per sample rate, shared."
+      },
+      "root": "dsp",
+      "manifestPath": "library/parts/dsp/osc.wavetable.json",
+      "purpose": "The wavetable oscillator: a phase accumulator reading band-limited tables.\n\nShape     — 0..4, continuous. Whole numbers are the pure shapes (OSC_SHAPE_LABELS); a fraction is a crossfade between\n            its two neighbours, so the wave morphs Sine → Triangle → Saw → Square rather than switching. A blend of\n            two band-limited tables is still band-limited. Past Square there is nothing to crossfade to: the square\n            narrows toward PULSE_WIDTH, so the last stretch is one shape getting thinner.\nWidth     — the square's duty, 0.01..0.99 (0.5 is a true square).\nOctave, Semitones, Cents — the tuning from the played pitch (setPitch).\nLevel     — the output gain, 0..1.\nPhase reset — on, noteOn() starts every note from the same point, so attacks are consistent.\n\nThe pulse is two saw reads offset by the width and subtracted, which keeps it band-limited at any width and lets the\nwidth be swept continuously. tick() takes a phase-modulation offset so the same oscillator serves as an FM operator\n(FmOperators.hpp) without a separate code path.\n\nsetParams() and setPitch() are block-rate; process() glides the frequency from the last block's to this one across\nthe block, and smooths the level.",
+      "parameters": [
+        {
+          "id": "shape",
+          "name": "Shape",
+          "kind": "float",
+          "min": 0,
+          "max": 4,
+          "default": 1,
+          "taper": "linear",
+          "unit": "",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "enumLabels": [
+            "Sine",
+            "Triangle",
+            "Saw",
+            "Square",
+            "Pulse"
+          ],
+          "note": "Whole numbers are the pure shapes; a fraction crossfades its two neighbours. From Square (3) to Pulse (4) the square narrows from Width to PULSE_WIDTH (0.125)."
+        },
+        {
+          "id": "width",
+          "name": "Width",
+          "kind": "float",
+          "min": 0.01,
+          "max": 0.99,
+          "default": 0.5,
+          "taper": "linear",
+          "unit": "%",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "The square's duty: 0.5 is a true square."
+        },
+        {
+          "id": "octave",
+          "name": "Octave",
+          "kind": "int",
+          "min": -2,
+          "max": 2,
+          "default": 0,
+          "taper": "linear",
+          "unit": "oct",
+          "group": "main",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Coarse tuning in whole octaves, two either way."
+        },
+        {
+          "id": "semitones",
+          "name": "Semitones",
+          "kind": "int",
+          "min": -24,
+          "max": 24,
+          "default": 0,
+          "taper": "linear",
+          "unit": "st",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "Tuning in whole semitones from the played pitch, two octaves either way."
+        },
+        {
+          "id": "cents",
+          "name": "Cents",
+          "kind": "float",
+          "min": -50,
+          "max": 50,
+          "default": 0,
+          "taper": "linear",
+          "unit": "ct",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "Fine tuning (detune), half a semitone either way."
+        },
+        {
+          "id": "level",
+          "name": "Level",
+          "kind": "float",
+          "min": 0,
+          "max": 1,
+          "default": 1,
+          "taper": "amp",
+          "unit": "amp",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "The output gain, smoothed over 10 ms."
+        },
+        {
+          "id": "phaseReset",
+          "name": "Phase reset",
+          "kind": "enum",
+          "min": 0,
+          "max": 2,
+          "default": 2,
+          "taper": "linear",
+          "unit": "",
+          "group": "main",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "enumLabels": [
+            "Free",
+            "Reset",
+            "From silence"
+          ],
+          "note": "When a note starts the phase over: Free never; Reset every note (consistent attacks, but a retrigger in a mono voice jumps mid-sound and clicks); From silence (the default) only a note that starts a silent voice. Pass noteOn(sounding) whether the voice's amp envelope is still sounding, so a legato or retriggered note in a mono voice carries on without a step."
+        }
+      ],
+      "api": [
+        "enum OscShape : int { Sin = 0, Tri = 1, Saw = 2, Square = 3, Pulse = 4 }",
+        "constexpr const char* OSC_SHAPE_LABELS[]",
+        "constexpr double PULSE_WIDTH",
+        "enum class PhaseReset { Free = 0, Reset = 1, FromSilence = 2 }",
+        "constexpr double OCTAVE_RANGE",
+        "constexpr double SEMITONE_RANGE",
+        "constexpr double CENTS_RANGE",
+        "inline double transpose(double hz, double semitones)",
+        "class WavetableOscillator",
+        "void prepare(double sampleRate)",
+        "void reset()",
+        "void noteOn(bool sounding = false, double startPhase = 0)",
+        "void setPitch(double hz)",
+        "void setParams(double shape, double octave = 0, double semitones = 0, double cents = 0, double width = 0.5, double level = 1, double phaseReset = 2)",
+        "double frequency() const",
+        "void process(float* out, int offset, int n)",
+        "void resetPhase()",
+        "void setPhase(double p)",
+        "void setShape(double shape)",
+        "void selectMip(double freqHz)",
+        "double tick(double inc, double pm, double pwm)"
+      ],
+      "runtimeFacts": {
+        "language": "C++17, header-only: each module is one .hpp in namespace dsp. Include it; there is nothing to link.",
+        "allocation": "Everything is allocated in prepare(). Audio-path methods are marked DSP_NONBLOCKING (noexcept, and [[clang::nonblocking]] where the compiler has it): no allocation, locks, I/O or exceptions in them.",
+        "imports": "The C++ standard library and other files in library/dsp/src only. No platform API.",
+        "randomness": "No std::rand or random_device; the seeded generator in src/dsp/util/random.hpp, so renders are reproducible.",
+        "state": "State lives in plain fields and fixed-size buffers. Every module exposes prepare / reset / process (or tick / render / advance).",
+        "sampleRate": "Any; passed to prepare(). Tests run at 48 kHz with 128-sample blocks.",
+        "target": "Any C++17 compiler. Each test is its own program (test/dsp/<name>.test.cpp); test.sh builds and runs them all.",
+        "dependencies": "None. The tests use the small harness in test/harness/."
+      },
+      "files": [
+        {
+          "path": "src/dsp/osc/WavetableOscillator.hpp",
+          "role": "entry",
+          "sha256": "1fbf0e6dccce1e8ce9e38c24e8fd7f91f0b5a88ce640f17292f5e3f8719ae25e",
+          "bytes": 8529
+        },
+        {
+          "path": "src/dsp/osc/wavetable.hpp",
+          "role": "dependency",
+          "sha256": "1a4e336a34974e640edb57fccff45b566060ff060ee74eab363bcd16773ccfa4",
+          "bytes": 4857
+        },
+        {
+          "path": "src/dsp/util/math.hpp",
+          "role": "dependency",
+          "sha256": "14af0cb7cab7efcf0492c5d2e53055e70eb67c696990985c369e35e7c04c8692",
+          "bytes": 1522
+        },
+        {
+          "path": "test/harness/check.hpp",
+          "role": "harness",
+          "sha256": "2b102af2a60300f7bfe71d363198988167c60828b15c007f5be0290e210c79b4",
+          "bytes": 4013
+        },
+        {
+          "path": "test/harness/signal.hpp",
+          "role": "harness",
+          "sha256": "6ed16d7e3bce367c2f71b641504bd6ddea63cbb8f9fde22c939430ff3a7dcd9f",
+          "bytes": 1182
+        },
+        {
+          "path": "test/dsp/wavetable-oscillator.test.cpp",
+          "role": "test",
+          "sha256": "141afbd20ac78cec41725be36da23badc1fe505c28018deb9a15d63d369d4967",
+          "bytes": 7193
+        }
+      ],
+      "bundleHash": "4f72d6964e7641fce8e6380d58b7a44cb611899b33bf25dce922cc5e26381167"
+    },
+    {
+      "schema": "lemnos-part/1",
+      "id": "seq.step-grid",
+      "version": "3.0.0",
+      "kind": "dsp",
+      "category": "seq",
+      "engine": "note",
+      "stages": [
+        "shared"
+      ],
+      "name": "Step grid sequencer",
+      "summary": "A sample-accurate step sequencer: a grid of seven scale degrees by up to 16 steps, every lit cell a note on its step, with Run, Steps, Tonic, Scale, Octave and Gate, at the synth's tempo.",
+      "tags": [
+        "sequencer",
+        "step",
+        "grid",
+        "scale"
+      ],
+      "favorite": false,
+      "runtime": "dsp",
+      "entry": "src/dsp/seq/StepSequencer.hpp",
+      "tests": [
+        "test/dsp/step-sequencer.test.cpp"
+      ],
+      "ports": [
+        {
+          "id": "params",
+          "name": "Settings and grid",
+          "kind": "control",
+          "direction": "in",
+          "rate": "block",
+          "description": "setParams(run, tempo, steps, tonic, scale, octave, gate) and setCell(row, step, on); read at each step. tempo is the Tempo input's."
+        },
+        {
+          "id": "notes",
+          "name": "Notes out",
+          "kind": "event",
+          "direction": "out",
+          "rate": "sample",
+          "description": "advance(maxSamples, sink) fires due notes into sink.noteOn(note, velocity) / sink.noteOff(note) and returns how many samples may render before the next event; the host calls it repeatedly across a block."
+        },
+        {
+          "id": "tempo",
+          "name": "Tempo",
+          "kind": "clock",
+          "direction": "in",
+          "rate": "block",
+          "channels": 1,
+          "description": "The synth's tempo in BPM (clock.tempo; 120 with no Tempo block). A bar is four beats; a step is the bar ÷ Steps."
+        }
+      ],
+      "host": "A host owns one StepSequencer, calls prepare(sampleRate), sets the params and cells, and inside each block alternates advance(remaining, sink) with rendering the returned number of samples, so every step lands on its exact sample.",
+      "notes": [
+        "Every note is struck at velocity 0.8.",
+        "reset() drops the sounding notes without note-offs (a panic) and, still running, starts the bar again."
+      ],
+      "perf": {
+        "cpu": "Counters only; a few note events per step."
+      },
+      "root": "dsp",
+      "manifestPath": "library/parts/dsp/seq.step-grid.json",
+      "purpose": "The step sequencer: a bar cut into steps, each step a column of the grid,\neach lit cell in the column a scale degree that fires when the step comes\nround. The clock is sample-accurate: the host asks how far it may render\nbefore the next event, renders that far, and lets the event fire — so a\nstep never waits for a block boundary.\n\nNothing here decides anything. The grid is what the user painted, the\ndegrees are the tonic and scale the user chose, and a column with three\ncells lit plays three notes. The settings are read at each step, so a\nchange lands at the next step rather than moving the one under way.\n\nRun      — on starts the bar from its first step at once; off releases\n           whatever is sounding and rewinds.\nTempo    — 30..300 BPM; a bar is four beats.\nSteps    — how many columns make a bar (SEQ_STEP_COUNTS).\nTonic, Scale, Octave — where the seven degrees (rows) land.\nGate     — how much of its step a note sounds, 0.05..1.",
+      "parameters": [
+        {
+          "id": "run",
+          "name": "Run",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "main",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "enumLabels": [
+            "Stop",
+            "Run"
+          ],
+          "note": "On starts the bar from its first step at once; off releases what is sounding and rewinds."
+        },
+        {
+          "id": "steps",
+          "name": "Steps",
+          "kind": "enum",
+          "min": 0,
+          "max": 5,
+          "default": 1,
+          "taper": "linear",
+          "unit": "",
+          "group": "main",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "enumLabels": [
+            "3",
+            "4",
+            "6",
+            "8",
+            "12",
+            "16"
+          ],
+          "note": "How many columns make a bar (an index into SEQ_STEP_COUNTS)."
+        },
+        {
+          "id": "tonic",
+          "name": "Tonic",
+          "kind": "enum",
+          "min": 0,
+          "max": 11,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "main",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "enumLabels": [
+            "C",
+            "C#",
+            "D",
+            "D#",
+            "E",
+            "F",
+            "F#",
+            "G",
+            "G#",
+            "A",
+            "A#",
+            "B"
+          ],
+          "note": "Degree 1's pitch class."
+        },
+        {
+          "id": "scale",
+          "name": "Scale",
+          "kind": "enum",
+          "min": 0,
+          "max": 3,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "main",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "enumLabels": [
+            "Major",
+            "Nat Min",
+            "Harm Min",
+            "Mel Min"
+          ],
+          "note": "The seven degrees' intervals (SCALE_INTERVALS)."
+        },
+        {
+          "id": "octave",
+          "name": "Octave",
+          "kind": "int",
+          "min": 1,
+          "max": 7,
+          "default": 4,
+          "taper": "linear",
+          "unit": "",
+          "group": "main",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 1 is MIDI 12·(octave + 1) + tonic: octave 4 puts C at 60."
+        },
+        {
+          "id": "gate",
+          "name": "Gate",
+          "kind": "float",
+          "min": 0.05,
+          "max": 1,
+          "default": 0.5,
+          "taper": "linear",
+          "unit": "%",
+          "group": "main",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "How much of its step a note sounds; at 1 it releases and restrikes on the step boundary."
+        },
+        {
+          "id": "d1s1",
+          "name": "1·1",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 1,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 1 on column 1 (setCell(0, 0, on))."
+        },
+        {
+          "id": "d1s2",
+          "name": "1·2",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 1 on column 2 (setCell(0, 1, on))."
+        },
+        {
+          "id": "d1s3",
+          "name": "1·3",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 1 on column 3 (setCell(0, 2, on))."
+        },
+        {
+          "id": "d1s4",
+          "name": "1·4",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 1 on column 4 (setCell(0, 3, on))."
+        },
+        {
+          "id": "d1s5",
+          "name": "1·5",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 1 on column 5 (setCell(0, 4, on))."
+        },
+        {
+          "id": "d1s6",
+          "name": "1·6",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 1 on column 6 (setCell(0, 5, on))."
+        },
+        {
+          "id": "d1s7",
+          "name": "1·7",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 1 on column 7 (setCell(0, 6, on))."
+        },
+        {
+          "id": "d1s8",
+          "name": "1·8",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 1,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 1 on column 8 (setCell(0, 7, on))."
+        },
+        {
+          "id": "d1s9",
+          "name": "1·9",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 1 on column 9 (setCell(0, 8, on))."
+        },
+        {
+          "id": "d1s10",
+          "name": "1·10",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 1 on column 10 (setCell(0, 9, on))."
+        },
+        {
+          "id": "d1s11",
+          "name": "1·11",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 1 on column 11 (setCell(0, 10, on))."
+        },
+        {
+          "id": "d1s12",
+          "name": "1·12",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 1 on column 12 (setCell(0, 11, on))."
+        },
+        {
+          "id": "d1s13",
+          "name": "1·13",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 1 on column 13 (setCell(0, 12, on))."
+        },
+        {
+          "id": "d1s14",
+          "name": "1·14",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 1 on column 14 (setCell(0, 13, on))."
+        },
+        {
+          "id": "d1s15",
+          "name": "1·15",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 1,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 1 on column 15 (setCell(0, 14, on))."
+        },
+        {
+          "id": "d1s16",
+          "name": "1·16",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 1 on column 16 (setCell(0, 15, on))."
+        },
+        {
+          "id": "d2s1",
+          "name": "2·1",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 2 on column 1 (setCell(1, 0, on))."
+        },
+        {
+          "id": "d2s2",
+          "name": "2·2",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 1,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 2 on column 2 (setCell(1, 1, on))."
+        },
+        {
+          "id": "d2s3",
+          "name": "2·3",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 2 on column 3 (setCell(1, 2, on))."
+        },
+        {
+          "id": "d2s4",
+          "name": "2·4",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 2 on column 4 (setCell(1, 3, on))."
+        },
+        {
+          "id": "d2s5",
+          "name": "2·5",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 2 on column 5 (setCell(1, 4, on))."
+        },
+        {
+          "id": "d2s6",
+          "name": "2·6",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 2 on column 6 (setCell(1, 5, on))."
+        },
+        {
+          "id": "d2s7",
+          "name": "2·7",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 2 on column 7 (setCell(1, 6, on))."
+        },
+        {
+          "id": "d2s8",
+          "name": "2·8",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 2 on column 8 (setCell(1, 7, on))."
+        },
+        {
+          "id": "d2s9",
+          "name": "2·9",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 1,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 2 on column 9 (setCell(1, 8, on))."
+        },
+        {
+          "id": "d2s10",
+          "name": "2·10",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 2 on column 10 (setCell(1, 9, on))."
+        },
+        {
+          "id": "d2s11",
+          "name": "2·11",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 2 on column 11 (setCell(1, 10, on))."
+        },
+        {
+          "id": "d2s12",
+          "name": "2·12",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 2 on column 12 (setCell(1, 11, on))."
+        },
+        {
+          "id": "d2s13",
+          "name": "2·13",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 2 on column 13 (setCell(1, 12, on))."
+        },
+        {
+          "id": "d2s14",
+          "name": "2·14",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 2 on column 14 (setCell(1, 13, on))."
+        },
+        {
+          "id": "d2s15",
+          "name": "2·15",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 2 on column 15 (setCell(1, 14, on))."
+        },
+        {
+          "id": "d2s16",
+          "name": "2·16",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 1,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 2 on column 16 (setCell(1, 15, on))."
+        },
+        {
+          "id": "d3s1",
+          "name": "3·1",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 3 on column 1 (setCell(2, 0, on))."
+        },
+        {
+          "id": "d3s2",
+          "name": "3·2",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 3 on column 2 (setCell(2, 1, on))."
+        },
+        {
+          "id": "d3s3",
+          "name": "3·3",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 1,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 3 on column 3 (setCell(2, 2, on))."
+        },
+        {
+          "id": "d3s4",
+          "name": "3·4",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 3 on column 4 (setCell(2, 3, on))."
+        },
+        {
+          "id": "d3s5",
+          "name": "3·5",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 3 on column 5 (setCell(2, 4, on))."
+        },
+        {
+          "id": "d3s6",
+          "name": "3·6",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 3 on column 6 (setCell(2, 5, on))."
+        },
+        {
+          "id": "d3s7",
+          "name": "3·7",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 3 on column 7 (setCell(2, 6, on))."
+        },
+        {
+          "id": "d3s8",
+          "name": "3·8",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 3 on column 8 (setCell(2, 7, on))."
+        },
+        {
+          "id": "d3s9",
+          "name": "3·9",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 3 on column 9 (setCell(2, 8, on))."
+        },
+        {
+          "id": "d3s10",
+          "name": "3·10",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 1,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 3 on column 10 (setCell(2, 9, on))."
+        },
+        {
+          "id": "d3s11",
+          "name": "3·11",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 3 on column 11 (setCell(2, 10, on))."
+        },
+        {
+          "id": "d3s12",
+          "name": "3·12",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 3 on column 12 (setCell(2, 11, on))."
+        },
+        {
+          "id": "d3s13",
+          "name": "3·13",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 3 on column 13 (setCell(2, 12, on))."
+        },
+        {
+          "id": "d3s14",
+          "name": "3·14",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 3 on column 14 (setCell(2, 13, on))."
+        },
+        {
+          "id": "d3s15",
+          "name": "3·15",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 3 on column 15 (setCell(2, 14, on))."
+        },
+        {
+          "id": "d3s16",
+          "name": "3·16",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 3 on column 16 (setCell(2, 15, on))."
+        },
+        {
+          "id": "d4s1",
+          "name": "4·1",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 4 on column 1 (setCell(3, 0, on))."
+        },
+        {
+          "id": "d4s2",
+          "name": "4·2",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 4 on column 2 (setCell(3, 1, on))."
+        },
+        {
+          "id": "d4s3",
+          "name": "4·3",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 4 on column 3 (setCell(3, 2, on))."
+        },
+        {
+          "id": "d4s4",
+          "name": "4·4",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 1,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 4 on column 4 (setCell(3, 3, on))."
+        },
+        {
+          "id": "d4s5",
+          "name": "4·5",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 4 on column 5 (setCell(3, 4, on))."
+        },
+        {
+          "id": "d4s6",
+          "name": "4·6",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 4 on column 6 (setCell(3, 5, on))."
+        },
+        {
+          "id": "d4s7",
+          "name": "4·7",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 4 on column 7 (setCell(3, 6, on))."
+        },
+        {
+          "id": "d4s8",
+          "name": "4·8",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 4 on column 8 (setCell(3, 7, on))."
+        },
+        {
+          "id": "d4s9",
+          "name": "4·9",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 4 on column 9 (setCell(3, 8, on))."
+        },
+        {
+          "id": "d4s10",
+          "name": "4·10",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 4 on column 10 (setCell(3, 9, on))."
+        },
+        {
+          "id": "d4s11",
+          "name": "4·11",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 1,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 4 on column 11 (setCell(3, 10, on))."
+        },
+        {
+          "id": "d4s12",
+          "name": "4·12",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 4 on column 12 (setCell(3, 11, on))."
+        },
+        {
+          "id": "d4s13",
+          "name": "4·13",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 4 on column 13 (setCell(3, 12, on))."
+        },
+        {
+          "id": "d4s14",
+          "name": "4·14",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 4 on column 14 (setCell(3, 13, on))."
+        },
+        {
+          "id": "d4s15",
+          "name": "4·15",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 4 on column 15 (setCell(3, 14, on))."
+        },
+        {
+          "id": "d4s16",
+          "name": "4·16",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 4 on column 16 (setCell(3, 15, on))."
+        },
+        {
+          "id": "d5s1",
+          "name": "5·1",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 5 on column 1 (setCell(4, 0, on))."
+        },
+        {
+          "id": "d5s2",
+          "name": "5·2",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 5 on column 2 (setCell(4, 1, on))."
+        },
+        {
+          "id": "d5s3",
+          "name": "5·3",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 5 on column 3 (setCell(4, 2, on))."
+        },
+        {
+          "id": "d5s4",
+          "name": "5·4",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 5 on column 4 (setCell(4, 3, on))."
+        },
+        {
+          "id": "d5s5",
+          "name": "5·5",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 1,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 5 on column 5 (setCell(4, 4, on))."
+        },
+        {
+          "id": "d5s6",
+          "name": "5·6",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 5 on column 6 (setCell(4, 5, on))."
+        },
+        {
+          "id": "d5s7",
+          "name": "5·7",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 5 on column 7 (setCell(4, 6, on))."
+        },
+        {
+          "id": "d5s8",
+          "name": "5·8",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 5 on column 8 (setCell(4, 7, on))."
+        },
+        {
+          "id": "d5s9",
+          "name": "5·9",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 5 on column 9 (setCell(4, 8, on))."
+        },
+        {
+          "id": "d5s10",
+          "name": "5·10",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 5 on column 10 (setCell(4, 9, on))."
+        },
+        {
+          "id": "d5s11",
+          "name": "5·11",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 5 on column 11 (setCell(4, 10, on))."
+        },
+        {
+          "id": "d5s12",
+          "name": "5·12",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 1,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 5 on column 12 (setCell(4, 11, on))."
+        },
+        {
+          "id": "d5s13",
+          "name": "5·13",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 5 on column 13 (setCell(4, 12, on))."
+        },
+        {
+          "id": "d5s14",
+          "name": "5·14",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 5 on column 14 (setCell(4, 13, on))."
+        },
+        {
+          "id": "d5s15",
+          "name": "5·15",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 5 on column 15 (setCell(4, 14, on))."
+        },
+        {
+          "id": "d5s16",
+          "name": "5·16",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 5 on column 16 (setCell(4, 15, on))."
+        },
+        {
+          "id": "d6s1",
+          "name": "6·1",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 6 on column 1 (setCell(5, 0, on))."
+        },
+        {
+          "id": "d6s2",
+          "name": "6·2",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 6 on column 2 (setCell(5, 1, on))."
+        },
+        {
+          "id": "d6s3",
+          "name": "6·3",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 6 on column 3 (setCell(5, 2, on))."
+        },
+        {
+          "id": "d6s4",
+          "name": "6·4",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 6 on column 4 (setCell(5, 3, on))."
+        },
+        {
+          "id": "d6s5",
+          "name": "6·5",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 6 on column 5 (setCell(5, 4, on))."
+        },
+        {
+          "id": "d6s6",
+          "name": "6·6",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 1,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 6 on column 6 (setCell(5, 5, on))."
+        },
+        {
+          "id": "d6s7",
+          "name": "6·7",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 6 on column 7 (setCell(5, 6, on))."
+        },
+        {
+          "id": "d6s8",
+          "name": "6·8",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 6 on column 8 (setCell(5, 7, on))."
+        },
+        {
+          "id": "d6s9",
+          "name": "6·9",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 6 on column 9 (setCell(5, 8, on))."
+        },
+        {
+          "id": "d6s10",
+          "name": "6·10",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 6 on column 10 (setCell(5, 9, on))."
+        },
+        {
+          "id": "d6s11",
+          "name": "6·11",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 6 on column 11 (setCell(5, 10, on))."
+        },
+        {
+          "id": "d6s12",
+          "name": "6·12",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 6 on column 12 (setCell(5, 11, on))."
+        },
+        {
+          "id": "d6s13",
+          "name": "6·13",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 1,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 6 on column 13 (setCell(5, 12, on))."
+        },
+        {
+          "id": "d6s14",
+          "name": "6·14",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 6 on column 14 (setCell(5, 13, on))."
+        },
+        {
+          "id": "d6s15",
+          "name": "6·15",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 6 on column 15 (setCell(5, 14, on))."
+        },
+        {
+          "id": "d6s16",
+          "name": "6·16",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 6 on column 16 (setCell(5, 15, on))."
+        },
+        {
+          "id": "d7s1",
+          "name": "7·1",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 7 on column 1 (setCell(6, 0, on))."
+        },
+        {
+          "id": "d7s2",
+          "name": "7·2",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 7 on column 2 (setCell(6, 1, on))."
+        },
+        {
+          "id": "d7s3",
+          "name": "7·3",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 7 on column 3 (setCell(6, 2, on))."
+        },
+        {
+          "id": "d7s4",
+          "name": "7·4",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 7 on column 4 (setCell(6, 3, on))."
+        },
+        {
+          "id": "d7s5",
+          "name": "7·5",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 7 on column 5 (setCell(6, 4, on))."
+        },
+        {
+          "id": "d7s6",
+          "name": "7·6",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 7 on column 6 (setCell(6, 5, on))."
+        },
+        {
+          "id": "d7s7",
+          "name": "7·7",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 1,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 7 on column 7 (setCell(6, 6, on))."
+        },
+        {
+          "id": "d7s8",
+          "name": "7·8",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 7 on column 8 (setCell(6, 7, on))."
+        },
+        {
+          "id": "d7s9",
+          "name": "7·9",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 7 on column 9 (setCell(6, 8, on))."
+        },
+        {
+          "id": "d7s10",
+          "name": "7·10",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 7 on column 10 (setCell(6, 9, on))."
+        },
+        {
+          "id": "d7s11",
+          "name": "7·11",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 7 on column 11 (setCell(6, 10, on))."
+        },
+        {
+          "id": "d7s12",
+          "name": "7·12",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 7 on column 12 (setCell(6, 11, on))."
+        },
+        {
+          "id": "d7s13",
+          "name": "7·13",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 7 on column 13 (setCell(6, 12, on))."
+        },
+        {
+          "id": "d7s14",
+          "name": "7·14",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 1,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 7 on column 14 (setCell(6, 13, on))."
+        },
+        {
+          "id": "d7s15",
+          "name": "7·15",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 7 on column 15 (setCell(6, 14, on))."
+        },
+        {
+          "id": "d7s16",
+          "name": "7·16",
+          "kind": "bool",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "grid",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Degree 7 on column 16 (setCell(6, 15, on))."
+        }
+      ],
+      "api": [
+        "constexpr int SEQ_ROWS",
+        "constexpr int MAX_SEQ_STEPS",
+        "constexpr int SEQ_STEP_COUNTS[]",
+        "constexpr const char* TONIC_LABELS[]",
+        "constexpr const char* SCALE_LABELS[]",
+        "constexpr int SCALE_INTERVALS[4][SEQ_ROWS]",
+        "class StepSequencer",
+        "void prepare(double sampleRate)",
+        "void reset()",
+        "void setParams(double run, double tempo, double steps, double tonic, double scale, double octave, double gate)",
+        "void setCell(int row, int column, double on)",
+        "bool cell(int row, int column) const",
+        "int currentStep() const",
+        "int advance(int maxSamples, NoteSink& sink)"
+      ],
+      "runtimeFacts": {
+        "language": "C++17, header-only: each module is one .hpp in namespace dsp. Include it; there is nothing to link.",
+        "allocation": "Everything is allocated in prepare(). Audio-path methods are marked DSP_NONBLOCKING (noexcept, and [[clang::nonblocking]] where the compiler has it): no allocation, locks, I/O or exceptions in them.",
+        "imports": "The C++ standard library and other files in library/dsp/src only. No platform API.",
+        "randomness": "No std::rand or random_device; the seeded generator in src/dsp/util/random.hpp, so renders are reproducible.",
+        "state": "State lives in plain fields and fixed-size buffers. Every module exposes prepare / reset / process (or tick / render / advance).",
+        "sampleRate": "Any; passed to prepare(). Tests run at 48 kHz with 128-sample blocks.",
+        "target": "Any C++17 compiler. Each test is its own program (test/dsp/<name>.test.cpp); test.sh builds and runs them all.",
+        "dependencies": "None. The tests use the small harness in test/harness/."
+      },
+      "files": [
+        {
+          "path": "src/dsp/seq/StepSequencer.hpp",
+          "role": "entry",
+          "sha256": "05ebc9d3c74fbe6510b7e6a62b1dfc114ae3b0f1634907409a51620dd9ce5d01",
+          "bytes": 6991
+        },
+        {
+          "path": "src/dsp/note/NoteSink.hpp",
+          "role": "dependency",
+          "sha256": "20bddc8790f3bbfe593815546cb6384057cd73f164301114896a200644e175a1",
+          "bytes": 381
+        },
+        {
+          "path": "src/dsp/util/math.hpp",
+          "role": "dependency",
+          "sha256": "14af0cb7cab7efcf0492c5d2e53055e70eb67c696990985c369e35e7c04c8692",
+          "bytes": 1522
+        },
+        {
+          "path": "test/harness/check.hpp",
+          "role": "harness",
+          "sha256": "2b102af2a60300f7bfe71d363198988167c60828b15c007f5be0290e210c79b4",
+          "bytes": 4013
+        },
+        {
+          "path": "test/harness/signal.hpp",
+          "role": "harness",
+          "sha256": "6ed16d7e3bce367c2f71b641504bd6ddea63cbb8f9fde22c939430ff3a7dcd9f",
+          "bytes": 1182
+        },
+        {
+          "path": "test/dsp/step-sequencer.test.cpp",
+          "role": "test",
+          "sha256": "4eec36a66960931f669e9373be5e54c50cca7f773e0c4e4b68280232bde7e1de",
+          "bytes": 7042
+        }
+      ],
+      "bundleHash": "3019aaeb28c92b41ed332eee9735171cf8e1efc95a625f1b61ba910259537960"
+    },
+    {
+      "schema": "lemnos-part/1",
+      "id": "util.scope",
+      "version": "1.0.1",
+      "kind": "dsp",
+      "category": "util",
+      "engine": "audio",
+      "stages": [
+        "global",
+        "voice",
+        "shared"
+      ],
+      "name": "Scope",
+      "summary": "The block an oscilloscope shows. Draw an audio arrow into it from any block (a reverb, an oscillator, a filter) and the oscilloscope bound to it shows that signal's wave. It changes nothing: its Thru output is its input, and it has no parameters.",
+      "tags": [
+        "scope",
+        "oscilloscope",
+        "display",
+        "thru"
+      ],
+      "favorite": false,
+      "runtime": "dsp",
+      "entry": "src/dsp/util/Thru.hpp",
+      "tests": [
+        "test/dsp/thru.test.cpp"
+      ],
+      "ports": [
+        {
+          "id": "audio-in",
+          "name": "Audio in",
+          "kind": "audio",
+          "direction": "in",
+          "rate": "sample",
+          "channels": 2,
+          "description": "What the oscilloscope shows. Every audio arrow into the block is summed into it first; a mono arrow feeds both channels."
+        },
+        {
+          "id": "thru",
+          "name": "Thru",
+          "kind": "audio",
+          "direction": "out",
+          "rate": "sample",
+          "channels": 2,
+          "description": "The input, unchanged. It can stay unwired: the engine keeps the newest samples of this output (the mean of its two channels) for the oscilloscope."
+        }
+      ],
+      "host": "A host owns one Thru per block, sums the audio of every block with an audio arrow into it into one stereo buffer pair, calls process(in, out, offset, n) per channel, and keeps the newest samples of the output for the display.",
+      "notes": [
+        "In Global (its default stage) an arrow from a Voice block reaches it through the sum point, so it shows every sounding voice summed. In Voice the engine sums every voice's copy.",
+        "The engine records it only while an oscilloscope on a page is bound to it (src/shared/pad-watch.js spectrumBlocks), read back by SCOPE.<DSP###>."
+      ],
+      "perf": {
+        "cpu": "One copy per sample per channel."
+      },
+      "root": "dsp",
+      "manifestPath": "library/parts/dsp/util.scope.json",
+      "purpose": "Thru: its stereo input, unchanged, at its output. It shapes nothing: it is the block a display watches (the\nWaterfall, util.waterfall; the Scope, util.scope; the Tuner, util.tuner), so a host records what was wired into it by recording its output.\n\nNo state and no allocation.",
+      "parameters": [],
+      "api": [
+        "class Thru",
+        "void process(const float* in, float* out, int offset, int n) const"
+      ],
+      "runtimeFacts": {
+        "language": "C++17, header-only: each module is one .hpp in namespace dsp. Include it; there is nothing to link.",
+        "allocation": "Everything is allocated in prepare(). Audio-path methods are marked DSP_NONBLOCKING (noexcept, and [[clang::nonblocking]] where the compiler has it): no allocation, locks, I/O or exceptions in them.",
+        "imports": "The C++ standard library and other files in library/dsp/src only. No platform API.",
+        "randomness": "No std::rand or random_device; the seeded generator in src/dsp/util/random.hpp, so renders are reproducible.",
+        "state": "State lives in plain fields and fixed-size buffers. Every module exposes prepare / reset / process (or tick / render / advance).",
+        "sampleRate": "Any; passed to prepare(). Tests run at 48 kHz with 128-sample blocks.",
+        "target": "Any C++17 compiler. Each test is its own program (test/dsp/<name>.test.cpp); test.sh builds and runs them all.",
+        "dependencies": "None. The tests use the small harness in test/harness/."
+      },
+      "files": [
+        {
+          "path": "src/dsp/util/Thru.hpp",
+          "role": "entry",
+          "sha256": "4575139ca98862870d82a4c7952036375eac7ac86f16a8846a0f5ed2cbd610ab",
+          "bytes": 762
+        },
+        {
+          "path": "src/dsp/util/math.hpp",
+          "role": "dependency",
+          "sha256": "14af0cb7cab7efcf0492c5d2e53055e70eb67c696990985c369e35e7c04c8692",
+          "bytes": 1522
+        },
+        {
+          "path": "test/harness/check.hpp",
+          "role": "harness",
+          "sha256": "2b102af2a60300f7bfe71d363198988167c60828b15c007f5be0290e210c79b4",
+          "bytes": 4013
+        },
+        {
+          "path": "test/harness/signal.hpp",
+          "role": "harness",
+          "sha256": "6ed16d7e3bce367c2f71b641504bd6ddea63cbb8f9fde22c939430ff3a7dcd9f",
+          "bytes": 1182
+        },
+        {
+          "path": "test/dsp/thru.test.cpp",
+          "role": "test",
+          "sha256": "48ccd456e990e9a6e1834b41e8893502cc81c20e0d59e8cd3d96c430ba59d098",
+          "bytes": 957
+        }
+      ],
+      "bundleHash": "b82ef4a75fecf853e3fdab88dcedfc9cb7d6fd462fc22fed7b732d0ab2fab267"
+    },
+    {
+      "schema": "lemnos-part/1",
+      "id": "util.tuner",
+      "version": "1.0.0",
+      "kind": "dsp",
+      "category": "util",
+      "engine": "audio",
+      "stages": [
+        "global",
+        "voice",
+        "shared"
+      ],
+      "name": "Tuner",
+      "summary": "The block a tuner shows. Draw an audio arrow into it from any block (an oscillator, a filter) and the tuner bound to it shows that signal's pitch: the nearest note, how many cents flat or sharp, and its frequency. It changes nothing: its Thru output is its input, and it has no parameters.",
+      "tags": [
+        "tuner",
+        "pitch",
+        "note",
+        "display",
+        "thru"
+      ],
+      "favorite": false,
+      "runtime": "dsp",
+      "entry": "src/dsp/util/Thru.hpp",
+      "tests": [
+        "test/dsp/thru.test.cpp"
+      ],
+      "ports": [
+        {
+          "id": "audio-in",
+          "name": "Audio in",
+          "kind": "audio",
+          "direction": "in",
+          "rate": "sample",
+          "channels": 2,
+          "description": "What the tuner reads. Every audio arrow into the block is summed into it first; a mono arrow feeds both channels."
+        },
+        {
+          "id": "thru",
+          "name": "Thru",
+          "kind": "audio",
+          "direction": "out",
+          "rate": "sample",
+          "channels": 2,
+          "description": "The input, unchanged. It can stay unwired: the engine keeps the newest samples of this output (the mean of its two channels) for the tuner."
+        }
+      ],
+      "host": "A host owns one Thru per block, sums the audio of every block with an audio arrow into it into one stereo buffer pair, calls process(in, out, offset, n) per channel, and keeps the newest samples of the output for the display.",
+      "notes": [
+        "In Global (its default stage) an arrow from a Voice block reaches it through the sum point, so it reads every sounding voice summed: a chord has no one pitch, and the tuner shows dashes. In Voice the engine sums every voice's copy.",
+        "The engine records it only while a tuner on a page is bound to it (src/shared/pad-watch.js spectrumBlocks), read back by TUNER.<DSP###>."
+      ],
+      "perf": {
+        "cpu": "One copy per sample per channel."
+      },
+      "root": "dsp",
+      "manifestPath": "library/parts/dsp/util.tuner.json",
+      "purpose": "Thru: its stereo input, unchanged, at its output. It shapes nothing: it is the block a display watches (the\nWaterfall, util.waterfall; the Scope, util.scope; the Tuner, util.tuner), so a host records what was wired into it by recording its output.\n\nNo state and no allocation.",
+      "parameters": [],
+      "api": [
+        "class Thru",
+        "void process(const float* in, float* out, int offset, int n) const"
+      ],
+      "runtimeFacts": {
+        "language": "C++17, header-only: each module is one .hpp in namespace dsp. Include it; there is nothing to link.",
+        "allocation": "Everything is allocated in prepare(). Audio-path methods are marked DSP_NONBLOCKING (noexcept, and [[clang::nonblocking]] where the compiler has it): no allocation, locks, I/O or exceptions in them.",
+        "imports": "The C++ standard library and other files in library/dsp/src only. No platform API.",
+        "randomness": "No std::rand or random_device; the seeded generator in src/dsp/util/random.hpp, so renders are reproducible.",
+        "state": "State lives in plain fields and fixed-size buffers. Every module exposes prepare / reset / process (or tick / render / advance).",
+        "sampleRate": "Any; passed to prepare(). Tests run at 48 kHz with 128-sample blocks.",
+        "target": "Any C++17 compiler. Each test is its own program (test/dsp/<name>.test.cpp); test.sh builds and runs them all.",
+        "dependencies": "None. The tests use the small harness in test/harness/."
+      },
+      "files": [
+        {
+          "path": "src/dsp/util/Thru.hpp",
+          "role": "entry",
+          "sha256": "4575139ca98862870d82a4c7952036375eac7ac86f16a8846a0f5ed2cbd610ab",
+          "bytes": 762
+        },
+        {
+          "path": "src/dsp/util/math.hpp",
+          "role": "dependency",
+          "sha256": "14af0cb7cab7efcf0492c5d2e53055e70eb67c696990985c369e35e7c04c8692",
+          "bytes": 1522
+        },
+        {
+          "path": "test/harness/check.hpp",
+          "role": "harness",
+          "sha256": "2b102af2a60300f7bfe71d363198988167c60828b15c007f5be0290e210c79b4",
+          "bytes": 4013
+        },
+        {
+          "path": "test/harness/signal.hpp",
+          "role": "harness",
+          "sha256": "6ed16d7e3bce367c2f71b641504bd6ddea63cbb8f9fde22c939430ff3a7dcd9f",
+          "bytes": 1182
+        },
+        {
+          "path": "test/dsp/thru.test.cpp",
+          "role": "test",
+          "sha256": "48ccd456e990e9a6e1834b41e8893502cc81c20e0d59e8cd3d96c430ba59d098",
+          "bytes": 957
+        }
+      ],
+      "bundleHash": "b82ef4a75fecf853e3fdab88dcedfc9cb7d6fd462fc22fed7b732d0ab2fab267"
+    },
+    {
+      "schema": "lemnos-part/1",
+      "id": "voice.allocation",
+      "version": "2.1.1",
+      "kind": "dsp",
+      "category": "voice",
+      "engine": "note",
+      "stages": [
+        "shared"
+      ],
+      "name": "Voice allocation",
+      "summary": "Assigns each note to one of up to 16 voice slots: a free slot first, else the quietest voice already releasing, else the oldest; Voices limits the slots in use. At one voice it follows the keys held: Priority picks which plays, and Trigger says whether a change of key while another is held restarts the voice or only moves its pitch. Trigger also says whether an envelope in Shared or Global starts again on each new key.",
+      "tags": [
+        "voices",
+        "polyphony",
+        "stealing",
+        "allocation",
+        "mono",
+        "legato",
+        "note priority"
+      ],
+      "favorite": false,
+      "runtime": "dsp",
+      "entry": "src/dsp/note/VoiceAllocator.hpp",
+      "tests": [
+        "test/dsp/voice-allocation.test.cpp"
+      ],
+      "ports": [
+        {
+          "id": "notes",
+          "name": "Notes in",
+          "kind": "event",
+          "direction": "in",
+          "rate": "block",
+          "description": "noteOn(note) returns the NoteChange to make (start, move or nothing on a slot); noteOff(note, out, capacity) writes the changes (releases, or at one voice a move or start onto the next key held) into out and returns how many; allNotesOff(out, capacity) writes the slots to release."
+        },
+        {
+          "id": "voice-state",
+          "name": "Voice levels and ends",
+          "kind": "control",
+          "direction": "in",
+          "rate": "block",
+          "description": "setLevel(slot, level) each block, for choosing the quietest to steal; finished(slot) when a voice's release ends."
+        }
+      ],
+      "host": "A host owns MAX_VOICES voices and one VoiceAllocator, calls prepare(sampleRate) and setParams(polyphony, priority, trigger), routes every note-on/off through it and does what each NoteChange says (Start: the voice's noteOn; Move: it plays the new note from now on, nothing restarts; Release: its noteOff), reports each voice's level and when it finishes, and renders only active slots (isActive).",
+      "notes": [
+        "Never allocates after construction; changing polyphony never glitches."
+      ],
+      "perf": {
+        "cpu": "At most MAX_VOICES comparisons per note, and at one voice up to 128 more (the keys held)."
+      },
+      "root": "dsp",
+      "manifestPath": "library/parts/dsp/voice.allocation.json",
+      "purpose": "Voice allocation and stealing, and how one voice follows the keys held.\n\nThe allocator keeps one slot per voice the host owns (up to MAX_VOICES) and says which slot each note plays on;\nthe host renders the voices. Polyphony only limits how many slots are used, so changing it never allocates.\n\nStealing prefers, in order: a free slot, the quietest slot already releasing, then the oldest. Taking a releasing\nvoice first means a stolen note is one the player has already let go of. \"Quietest\" is the level the host reports\nfor each voice (setLevel), so the allocator never looks at audio itself.\n\nAt one voice the allocator keeps the keys held (MIDI notes 0..127; another note plays as at more voices) and the\nvoice plays one of them, chosen by Priority. Letting go of the key it plays moves it to the next one held, by the\nsame Priority; letting go of the last releases it. Trigger says how the voice changes key while another is held:\nRetrigger starts it again (its envelopes attack from where they are), Legato only moves its pitch. A key pressed\nwith nothing held always starts the voice.\n\nPolyphony — 1..MAX_VOICES slots in use; a slot that falls outside a new limit is freed.\nPriority  — at one voice, which held key plays: Last (the latest pressed), Low, High.\nTrigger   — at one voice, a change of key while another is held: Retrigger or Legato.",
+      "parameters": [
+        {
+          "id": "polyphony",
+          "name": "Voices",
+          "kind": "int",
+          "min": 1,
+          "max": 16,
+          "default": 8,
+          "taper": "linear",
+          "unit": "",
+          "group": "main",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "How many slots are used; a slot outside a new limit is freed."
+        },
+        {
+          "id": "priority",
+          "name": "Priority",
+          "kind": "enum",
+          "min": 0,
+          "max": 2,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "main",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "enumLabels": [
+            "Last",
+            "Low",
+            "High"
+          ],
+          "note": "At one voice, which held key plays: Last (the latest pressed), Low or High. Letting go of it moves the voice to the next key held by the same rule; letting go of the last releases it. More voices: no effect."
+        },
+        {
+          "id": "trigger",
+          "name": "Trigger",
+          "kind": "enum",
+          "min": 0,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "main",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "enumLabels": [
+            "Retrigger",
+            "Legato"
+          ],
+          "note": "A new key while another is held. At one voice: Retrigger starts the voice again (its envelopes attack from where they are), Legato only moves its pitch. At any number of voices it also drives each envelope in Shared or Global (one for the whole instrument): Retrigger starts it again on every new key, Legato leaves it running until the last key is let go. A key pressed with nothing held always starts them."
+        }
+      ],
+      "api": [
+        "constexpr int MAX_VOICES",
+        "constexpr int NOTE_KEYS",
+        "constexpr int PRIORITY_LAST",
+        "constexpr int PRIORITY_LOW",
+        "constexpr int PRIORITY_HIGH",
+        "constexpr const char* PRIORITY_LABELS[]",
+        "constexpr int TRIGGER_RETRIGGER",
+        "constexpr int TRIGGER_LEGATO",
+        "constexpr const char* TRIGGER_LABELS[]",
+        "enum class NoteAction : std::uint8_t { None, Start, Move, Release }",
+        "struct NoteChange",
+        "int slot",
+        "int note",
+        "NoteAction action",
+        "class VoiceAllocator",
+        "void prepare(double)",
+        "void reset()",
+        "void setParams(double polyphonyValue, double priorityValue = PRIORITY_LAST, double triggerValue = TRIGGER_RETRIGGER)",
+        "int getPolyphony() const",
+        "int getPriority() const",
+        "int getTrigger() const",
+        "NoteChange noteOn(int note)",
+        "int noteOff(int note, NoteChange* out, int capacity)",
+        "int allNotesOff(std::int32_t* out, int capacity)",
+        "void setLevel(int i, double level)",
+        "void finished(int i)",
+        "bool isActive(int i) const",
+        "bool isReleased(int i) const",
+        "int noteOf(int i) const",
+        "bool isHeld(int note) const",
+        "int activeCount() const"
+      ],
+      "runtimeFacts": {
+        "language": "C++17, header-only: each module is one .hpp in namespace dsp. Include it; there is nothing to link.",
+        "allocation": "Everything is allocated in prepare(). Audio-path methods are marked DSP_NONBLOCKING (noexcept, and [[clang::nonblocking]] where the compiler has it): no allocation, locks, I/O or exceptions in them.",
+        "imports": "The C++ standard library and other files in library/dsp/src only. No platform API.",
+        "randomness": "No std::rand or random_device; the seeded generator in src/dsp/util/random.hpp, so renders are reproducible.",
+        "state": "State lives in plain fields and fixed-size buffers. Every module exposes prepare / reset / process (or tick / render / advance).",
+        "sampleRate": "Any; passed to prepare(). Tests run at 48 kHz with 128-sample blocks.",
+        "target": "Any C++17 compiler. Each test is its own program (test/dsp/<name>.test.cpp); test.sh builds and runs them all.",
+        "dependencies": "None. The tests use the small harness in test/harness/."
+      },
+      "files": [
+        {
+          "path": "src/dsp/note/VoiceAllocator.hpp",
+          "role": "entry",
+          "sha256": "79f0b5b5ff8a3a635382659da2c938afaa7cba12a7089112ee6d9852d88a5c4a",
+          "bytes": 8527
+        },
+        {
+          "path": "src/dsp/util/math.hpp",
+          "role": "dependency",
+          "sha256": "14af0cb7cab7efcf0492c5d2e53055e70eb67c696990985c369e35e7c04c8692",
+          "bytes": 1522
+        },
+        {
+          "path": "test/harness/check.hpp",
+          "role": "harness",
+          "sha256": "2b102af2a60300f7bfe71d363198988167c60828b15c007f5be0290e210c79b4",
+          "bytes": 4013
+        },
+        {
+          "path": "test/harness/signal.hpp",
+          "role": "harness",
+          "sha256": "6ed16d7e3bce367c2f71b641504bd6ddea63cbb8f9fde22c939430ff3a7dcd9f",
+          "bytes": 1182
+        },
+        {
+          "path": "test/dsp/voice-allocation.test.cpp",
+          "role": "test",
+          "sha256": "ab4ab2da3cd774a426e4796aa79ac466fa509e008c37cc9c00dd223eaeabe58a",
+          "bytes": 6060
+        }
+      ],
+      "bundleHash": "b207073e8cc1893196c5337616e75638d6fc90030400ca33ee49a4a0dd496170"
+    },
+    {
+      "schema": "lemnos-part/1",
+      "version": "1.0.0",
+      "kind": "dsp",
+      "favorite": false,
+      "runtime": "dsp",
+      "perf": {},
+      "id": "voice.tuning",
+      "category": "voice",
+      "engine": "note",
+      "stages": [
+        "shared"
+      ],
+      "name": "Tuning",
+      "summary": "Where the keyboard sits in pitch: A4 reference (415–466 Hz), Transpose in semitones and Fine in cents, in twelve-tone equal temperament.",
+      "tags": [
+        "tuning",
+        "pitch",
+        "transpose",
+        "a4"
+      ],
+      "entry": "src/dsp/note/Tuning.hpp",
+      "tests": [
+        "test/dsp/tuning.test.cpp"
+      ],
+      "ports": [
+        {
+          "id": "params",
+          "name": "Params",
+          "kind": "control",
+          "direction": "in",
+          "rate": "block",
+          "description": "setParams(a4, transpose, fine) whenever a param changes."
+        },
+        {
+          "id": "pitch",
+          "name": "Pitch",
+          "kind": "control",
+          "direction": "out",
+          "rate": "block",
+          "description": "pitch(note) in semitones (note + Transpose + Fine/100); hz(semitones) against A4; noteToHz(note) both."
+        }
+      ],
+      "host": "The engine owns one Tuning. Take pitch() of each voice's note (after portamento), add bend and pitch modulation in semitones, and give the oscillators hz() of the sum.",
+      "notes": [],
+      "root": "dsp",
+      "manifestPath": "library/parts/dsp/voice.tuning.json",
+      "purpose": "Tuning: where the keyboard sits in pitch. Twelve-tone equal temperament around a reference A4.\n\n  pitch(note) = note + Transpose + Fine / 100            (semitones, a MIDI note number)\n  hz(pitch)   = A4 × 2^((pitch − 69) / 12)\n\nA4 — the reference pitch, TUNING_A4_MIN..TUNING_A4_MAX Hz (440).\nTranspose — whole semitones, ±TUNING_TRANSPOSE_MAX.\nFine — cents, ±100.\n\nThe host takes pitch() of each voice's note (after portamento, before bend and pitch modulation, which add in\nsemitones) and hz() of the sum for its oscillators. Pure arithmetic.",
+      "parameters": [
+        {
+          "id": "a4",
+          "name": "A4",
+          "kind": "float",
+          "min": 415,
+          "max": 466,
+          "default": 440,
+          "taper": "linear",
+          "unit": "Hz",
+          "group": "main",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "The reference pitch of A4 (MIDI note 69)."
+        },
+        {
+          "id": "transpose",
+          "name": "Transpose",
+          "kind": "int",
+          "min": -24,
+          "max": 24,
+          "default": 0,
+          "taper": "linear",
+          "unit": "st",
+          "group": "main",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Whole semitones added to every note."
+        },
+        {
+          "id": "fine",
+          "name": "Fine",
+          "kind": "float",
+          "min": -100,
+          "max": 100,
+          "default": 0,
+          "taper": "linear",
+          "unit": "ct",
+          "group": "main",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Cents added to every note."
+        }
+      ],
+      "api": [
+        "constexpr double TUNING_A4_MIN",
+        "constexpr double TUNING_A4_MAX",
+        "constexpr double TUNING_A4_DEFAULT",
+        "constexpr double TUNING_TRANSPOSE_MAX",
+        "constexpr double TUNING_FINE_MAX",
+        "class Tuning",
+        "void setParams(double a4Hz, double transposeSemitones, double fineCents)",
+        "double pitch(double note) const",
+        "double hz(double semitones) const",
+        "double noteToHz(double note) const"
+      ],
+      "runtimeFacts": {
+        "language": "C++17, header-only: each module is one .hpp in namespace dsp. Include it; there is nothing to link.",
+        "allocation": "Everything is allocated in prepare(). Audio-path methods are marked DSP_NONBLOCKING (noexcept, and [[clang::nonblocking]] where the compiler has it): no allocation, locks, I/O or exceptions in them.",
+        "imports": "The C++ standard library and other files in library/dsp/src only. No platform API.",
+        "randomness": "No std::rand or random_device; the seeded generator in src/dsp/util/random.hpp, so renders are reproducible.",
+        "state": "State lives in plain fields and fixed-size buffers. Every module exposes prepare / reset / process (or tick / render / advance).",
+        "sampleRate": "Any; passed to prepare(). Tests run at 48 kHz with 128-sample blocks.",
+        "target": "Any C++17 compiler. Each test is its own program (test/dsp/<name>.test.cpp); test.sh builds and runs them all.",
+        "dependencies": "None. The tests use the small harness in test/harness/."
+      },
+      "files": [
+        {
+          "path": "src/dsp/note/Tuning.hpp",
+          "role": "entry",
+          "sha256": "8ed64b800dfb2fa03fd391e451b03c299501e3fa51acc61dfc5471c56ed7cb76",
+          "bytes": 1866
+        },
+        {
+          "path": "src/dsp/util/math.hpp",
+          "role": "dependency",
+          "sha256": "14af0cb7cab7efcf0492c5d2e53055e70eb67c696990985c369e35e7c04c8692",
+          "bytes": 1522
+        },
+        {
+          "path": "test/harness/check.hpp",
+          "role": "harness",
+          "sha256": "2b102af2a60300f7bfe71d363198988167c60828b15c007f5be0290e210c79b4",
+          "bytes": 4013
+        },
+        {
+          "path": "test/dsp/tuning.test.cpp",
+          "role": "test",
+          "sha256": "37e4c7b9358aa5ea5bbc4b72f406da11994cd81eeb9ceac2f7800132af74fd64",
+          "bytes": 743
+        }
+      ],
+      "bundleHash": "3131ecb796638663ad0aaa9e6c114c54b0ffabf861648f016166fc193fdea25b"
+    },
+    {
+      "schema": "lemnos-part/1",
+      "version": "2.0.1",
+      "kind": "dsp",
+      "favorite": false,
+      "runtime": "dsp",
+      "perf": {},
+      "id": "voice.unison",
+      "category": "voice",
+      "engine": "note",
+      "stages": [
+        "shared"
+      ],
+      "name": "Unison",
+      "summary": "Plays each voice's oscillators as up to 8 copies, spread in pitch by Detune (along a Detune curve) and summed in mono.",
+      "tags": [
+        "unison",
+        "voices",
+        "detune"
+      ],
+      "entry": "src/dsp/note/Unison.hpp",
+      "tests": [
+        "test/dsp/unison.test.cpp"
+      ],
+      "ports": [
+        {
+          "id": "params",
+          "name": "Params",
+          "kind": "control",
+          "direction": "in",
+          "rate": "block",
+          "description": "setParams(unison, detune, detuneCurve) whenever a param changes."
+        },
+        {
+          "id": "copies",
+          "name": "Copies",
+          "kind": "control",
+          "direction": "out",
+          "rate": "block",
+          "description": "count() copies per oscillator; copy i at cents(i) from the voice's pitch, each at gain()."
+        }
+      ],
+      "host": "The engine owns one Unison and hands count(), every cents(i) and gain() to each voice. Each oscillator that takes unison (its manifest says \"unison\": true) plays count() copies, copy i detuned by cents(i), summed at gain() (1/sqrt(count())) into its mono output.",
+      "notes": [
+        "Polyphony stays on voice.allocation: unison multiplies each voice, it does not take voice slots.",
+        "The copies are not panned: the oscillators' outputs are mono. Width comes from what follows them (a chorus, an ensemble)."
+      ],
+      "root": "dsp",
+      "manifestPath": "library/parts/dsp/voice.unison.json",
+      "purpose": "Unison: each voice's oscillators play as up to UNISON_MAX copies, spread in pitch, summed in mono.\n\nCopy i of n sits at a position p from −1 (the first) to +1 (the last), evenly; a single copy sits at 0. Its pitch\noffset is p's sign times the response curve (util/responseCurve.hpp) of |p|, from 0 to Detune cents, so Detune is\nhow far the outermost copies sit from the note and Detune curve says how the inner ones crowd toward the centre\n(+1) or out toward the edges (−1).\n\nUnison — copies per voice, 1..UNISON_MAX (1 is off).\nDetune — the outermost copies' offset, 0..UNISON_DETUNE_MAX cents.\nDetune curve — −1..1: the response curve's bend over the copies' positions.\n\nThe host plays count() copies of each oscillator, copy i at cents(i) from the voice's pitch, and sums them at gain()\n(1 / sqrt(count())) to keep the level even. The copies are not panned: an oscillator's output is mono. Pure\narithmetic; nothing allocates.",
+      "parameters": [
+        {
+          "id": "unison",
+          "name": "Unison",
+          "kind": "int",
+          "min": 1,
+          "max": 8,
+          "default": 1,
+          "taper": "linear",
+          "unit": "",
+          "group": "main",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "Copies per voice; 1 is off."
+        },
+        {
+          "id": "detune",
+          "name": "Detune",
+          "kind": "float",
+          "min": 0,
+          "max": 100,
+          "default": 15,
+          "taper": "linear",
+          "unit": "ct",
+          "group": "main",
+          "modulatable": true,
+          "audioRate": false,
+          "declared": true,
+          "note": "How far the outermost copies sit from the note, in cents."
+        },
+        {
+          "id": "detuneCurve",
+          "name": "Detune curve",
+          "kind": "float",
+          "min": -1,
+          "max": 1,
+          "default": 0,
+          "taper": "linear",
+          "unit": "",
+          "group": "main",
+          "modulatable": false,
+          "audioRate": false,
+          "declared": true,
+          "note": "The response curve's bend over the copies' positions: + crowds the inner copies toward the note, − pushes them out."
+        }
+      ],
+      "api": [
+        "constexpr int UNISON_MAX",
+        "constexpr double UNISON_DETUNE_MAX",
+        "class Unison",
+        "void setParams(double unison, double detuneCents, double detuneCurve)",
+        "int count() const",
+        "double position(int i) const",
+        "double cents(int i) const",
+        "double gain() const"
+      ],
+      "runtimeFacts": {
+        "language": "C++17, header-only: each module is one .hpp in namespace dsp. Include it; there is nothing to link.",
+        "allocation": "Everything is allocated in prepare(). Audio-path methods are marked DSP_NONBLOCKING (noexcept, and [[clang::nonblocking]] where the compiler has it): no allocation, locks, I/O or exceptions in them.",
+        "imports": "The C++ standard library and other files in library/dsp/src only. No platform API.",
+        "randomness": "No std::rand or random_device; the seeded generator in src/dsp/util/random.hpp, so renders are reproducible.",
+        "state": "State lives in plain fields and fixed-size buffers. Every module exposes prepare / reset / process (or tick / render / advance).",
+        "sampleRate": "Any; passed to prepare(). Tests run at 48 kHz with 128-sample blocks.",
+        "target": "Any C++17 compiler. Each test is its own program (test/dsp/<name>.test.cpp); test.sh builds and runs them all.",
+        "dependencies": "None. The tests use the small harness in test/harness/."
+      },
+      "files": [
+        {
+          "path": "src/dsp/note/Unison.hpp",
+          "role": "entry",
+          "sha256": "1660f7de110d26ce9fce0ddf3b236578a942234e4e7d9e510f18f572c1412d75",
+          "bytes": 2394
+        },
+        {
+          "path": "src/dsp/util/math.hpp",
+          "role": "dependency",
+          "sha256": "14af0cb7cab7efcf0492c5d2e53055e70eb67c696990985c369e35e7c04c8692",
+          "bytes": 1522
+        },
+        {
+          "path": "src/dsp/util/responseCurve.hpp",
+          "role": "dependency",
+          "sha256": "f395ff1b95bb87c0805ad21ecffb70cc99061958e48a8f441ca57e2651bf82fe",
+          "bytes": 1492
+        },
+        {
+          "path": "test/harness/check.hpp",
+          "role": "harness",
+          "sha256": "2b102af2a60300f7bfe71d363198988167c60828b15c007f5be0290e210c79b4",
+          "bytes": 4013
+        },
+        {
+          "path": "test/dsp/unison.test.cpp",
+          "role": "test",
+          "sha256": "72893f986dfba5bc2b96ff79b7f5880efedab97fdf40595fcf398a92202da307",
+          "bytes": 1118
+        }
+      ],
+      "bundleHash": "c173fa292650e7a5a303bfa0e66d5000ea9db8380507ed995127da89bc0b43a2"
+    }
+  ],
+  "navigation": [
+    {
+      "schema": "lemnos-navigation/1",
+      "id": "hybrid",
+      "version": "2.0.0",
+      "name": "Hybrid navigation",
+      "summary": "Pointer, keyboard, and controller model: the pointer (or a stick, through moveCursor) highlights, WASD/arrows/d-pad step the highlight by screen geometry, and one action (Space, the mouse button, controller A) grabs indicators, pushes buttons, and flips toggles.",
+      "preferences": {
+        "holdToAdjust": true,
+        "holdKey": "Space",
+        "pointToSelect": true,
+        "absolute": false,
+        "cursorDot": true,
+        "holdToTurn": true,
+        "flipLists": false,
+        "altLatches": false
+      },
+      "actions": [
+        {
+          "id": "tab.prev",
+          "group": "Pages and layers",
+          "name": "Previous page",
+          "description": "Step to the previous page and wrap at the first page.",
+          "codes": [
+            "KeyQ"
+          ],
+          "inputs": [
+            "Gamepad:4"
+          ]
+        },
+        {
+          "id": "tab.next",
+          "group": "Pages and layers",
+          "name": "Next page",
+          "description": "Step to the next page and wrap at the last page, so Tab cycles the pages.",
+          "codes": [
+            "KeyE",
+            "Tab"
+          ],
+          "inputs": [
+            "Gamepad:5"
+          ]
+        },
+        {
+          "id": "group.next",
+          "group": "Pages and layers",
+          "name": "Next layer or member",
+          "description": "Advance a layered page or the active member of a grouped section. No default key; the user assigns one.",
+          "codes": []
+        },
+        {
+          "id": "control.prev",
+          "group": "Control focus",
+          "name": "Move left",
+          "description": "Move within a row, then to the nearest control wholly to the left.",
+          "codes": [
+            "KeyA",
+            "ArrowLeft"
+          ],
+          "inputs": [
+            "Gamepad:14"
+          ]
+        },
+        {
+          "id": "control.next",
+          "group": "Control focus",
+          "name": "Move right",
+          "description": "Move within a row, then to the nearest control wholly to the right.",
+          "codes": [
+            "KeyD",
+            "ArrowRight"
+          ],
+          "inputs": [
+            "Gamepad:15"
+          ]
+        },
+        {
+          "id": "control.up",
+          "group": "Control focus",
+          "name": "Move up",
+          "description": "Move to the nearest control in the row above while preserving the goal column.",
+          "codes": [
+            "KeyW",
+            "ArrowUp"
+          ],
+          "inputs": [
+            "Gamepad:12"
+          ]
+        },
+        {
+          "id": "control.down",
+          "group": "Control focus",
+          "name": "Move down",
+          "description": "Move to the nearest control in the row below while preserving the goal column.",
+          "codes": [
+            "KeyS",
+            "ArrowDown"
+          ],
+          "inputs": [
+            "Gamepad:13"
+          ]
+        },
+        {
+          "id": "control.adjust",
+          "group": "Control actions",
+          "name": "Action",
+          "description": "Operates the highlighted control. On an indicator, hold to grab it: the cursor stays where it is and dims, the pointer locks, the indicator lights up fully, and travel moves it relatively; release to give the pointer back. On a button, press (held while the action is held); on a toggle, flip; on any other button-like control, press it — each lights fully and fades back. The primary mouse button always acts, bound or not.",
+          "codes": [
+            "Space"
+          ],
+          "inputs": [
+            "Mouse:0",
+            "Gamepad:0"
+          ]
+        },
+        {
+          "id": "control.reset",
+          "group": "Control actions",
+          "name": "Reset control",
+          "description": "Put the highlighted handle or choice back at its default (its type's starting point). Only that one: the component's other handles, a step sequencer's grid and a rotary's flips stay. Tap only.",
+          "codes": [
+            "KeyC"
+          ]
+        },
+        {
+          "id": "wire.toggle",
+          "group": "Control actions",
+          "name": "Wire main / Y axis",
+          "description": "Arm or complete a connection for the control's main or Y output.",
+          "codes": [
+            "Equal"
+          ]
+        },
+        {
+          "id": "wire.toggleX",
+          "group": "Control actions",
+          "name": "Wire X axis",
+          "description": "Arm or complete a connection for the X output of a two-axis control.",
+          "codes": [
+            "Minus"
+          ]
+        },
+        {
+          "id": "wire.cancel",
+          "group": "Control actions",
+          "name": "Cancel wiring",
+          "description": "Cancel the currently armed connection.",
+          "codes": [
+            "Backspace"
+          ]
+        },
+        {
+          "id": "mod.toggle",
+          "group": "Product actions",
+          "name": "Mod mode",
+          "description": "Turn mod mode on at the highlighted module (else the one under the pointer or last touched); press again, at any time, to turn it off. A right click on the page does the same. Tap only.",
+          "codes": [
+            "KeyR"
+          ],
+          "inputs": [
+            "Mouse:2",
+            "Gamepad:2"
+          ]
+        },
+        {
+          "id": "help.toggle",
+          "group": "Product actions",
+          "name": "Help",
+          "description": "Show or hide the Help card: every action and its inputs, and brief tips on how the synth is played. Tap only; Esc (controller B) also closes it.",
+          "codes": [
+            "KeyI"
+          ],
+          "inputs": [
+            "Gamepad:3"
+          ]
+        },
+        {
+          "id": "pitch.hold",
+          "group": "Product actions",
+          "name": "Pitch shift",
+          "description": "Hold to shift the pitch: while it is held, every note moves by the semitones and direction the Pitch shift pad sets; let go and the notes go back.",
+          "codes": [
+            "ShiftLeft",
+            "ShiftRight"
+          ]
+        },
+        {
+          "id": "preset.open",
+          "group": "Product actions",
+          "name": "Open presets",
+          "description": "Open the product's preset browser and suspend navigation while typing. No default key; the user assigns one.",
+          "codes": []
+        },
+        {
+          "id": "panic",
+          "group": "Product actions",
+          "name": "Panic / escape",
+          "description": "Stop held notes, cancel transient interaction, or close the topmost temporary layer (in Test mode: a mod mode pick, else Connect's choices, else mod mode).",
+          "codes": [
+            "Escape"
+          ],
+          "inputs": [
+            "Gamepad:1"
+          ]
+        },
+        {
+          "id": "seq.chaos",
+          "group": "Product actions",
+          "name": "Primary page action",
+          "description": "Invoke the page's primary contextual action, such as sequencer Chaos.",
+          "codes": [
+            "KeyB"
+          ]
+        },
+        {
+          "id": "seq.clear",
+          "group": "Product actions",
+          "name": "Clear page action",
+          "description": "Invoke the page's destructive contextual action, such as sequencer Clear.",
+          "codes": [
+            "KeyN",
+            "Delete"
+          ]
+        }
+      ],
+      "rules": {
+        "spatialRows": true,
+        "preserveGoalColumn": true,
+        "spatialRowEnds": true,
+        "spatialMaxAngle": 80,
+        "spatialCrossWeight": 0.5,
+        "pageWrap": true,
+        "textEntrySuspends": true,
+        "popupFocusTrap": true,
+        "restorePopupFocus": true,
+        "musicalKeyboardPolicy": "caps-lock",
+        "musicalKeyboardLayout": "piano",
+        "octaveKeys": [
+          "KeyZ",
+          "KeyX"
+        ],
+        "arrowsWhilePlaying": true,
+        "pausePageKeysWhilePlaying": true
+      },
+      "tuning": {
+        "wheelPixelsPerStep": 100,
+        "dragPixelsPerStep": 10,
+        "discreteDetentPixels": 12,
+        "switchDetentPixels": 30,
+        "navPixelsPerStep": 40,
+        "navBeamPixels": 24,
+        "accelerationStart": 4,
+        "accelerationFull": 40,
+        "maximumGain": 3,
+        "relativePixelsPerPixel": 1,
+        "nudgeViewport": 0.004,
+        "gamepadDeadZone": 0.15,
+        "gamepadStickSpeed": 0.72,
+        "gamepadAdjustSpeed": 0.24,
+        "gamepadStickStepThreshold": 0.5,
+        "gamepadRepeatDelayMs": 350,
+        "gamepadRepeatMs": 110
+      },
+      "provenance": {
+        "note": "Written for Lemnos."
+      }
+    }
+  ]
+}

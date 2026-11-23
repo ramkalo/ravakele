@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ravakele</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="layout.css">
+<link rel="stylesheet" href="runtime.css">
+<style>
+html, body { margin: 0; height: 100%; background: #0f1115; color: #d8dee9; font: 13px/1.4 ui-monospace, monospace; overflow: hidden; }
+#stage { position: absolute; inset: 0; display: grid; place-items: center; }
+#synth { display: grid; place-items: center; }
+#start { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(15, 17, 21, .6); border: 0; color: inherit; font: inherit; font-size: 15px; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+#start[hidden] { display: none; }
+#status { position: absolute; left: 12px; bottom: 10px; color: #8b93a7; }
+#issues-toggle { position: absolute; right: 12px; bottom: 8px; background: transparent; border: 1px solid #39404f; color: #8b93a7; font: inherit; padding: 2px 8px; cursor: pointer; }
+#issues-toggle[hidden], #issues[hidden] { display: none; }
+#issues { position: absolute; right: 12px; bottom: 36px; max-width: min(560px, calc(100% - 24px)); max-height: 60%; overflow: auto; padding: 10px 12px; border: 1px solid #39404f; background: #171a21; }
+.lemnos-issues { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 11px; }
+.lemnos-issue-severity { text-transform: uppercase; letter-spacing: .06em; color: #8b93a7; }
+.lemnos-issue-error .lemnos-issue-severity { color: #f07878; }
+.lemnos-issue code { color: #8b93a7; }
+</style>
+</head>
+<body>
+<div id="stage"><div id="synth"></div></div>
+<button id="start">Click or press a key to start the sound</button>
+<div id="status"></div>
+<button id="issues-toggle" hidden aria-expanded="false"></button>
+<div id="issues" hidden></div>
+<script type="module" src="player.js"></script>
+</body>
+</html>

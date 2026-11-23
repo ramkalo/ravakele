@@ -1,0 +1,73 @@
+{
+  "schema": "lemnos-pack-lock/2",
+  "kind": "synth",
+  "name": "ravakele-synth",
+  "exportedAt": "2026-11-23T01:05:38.128Z",
+  "project": {
+    "id": "project_mwbdxcc3_ejgga",
+    "name": "Ravakele",
+    "schemaVersion": 96
+  },
+  "parts": [
+    {
+      "id": "filter.morph",
+      "version": "3.0.1",
+      "bundleHash": "32802800791893c7fd9cb9bf78387fbff1744e202afc714d52ab1f847f16f001"
+    },
+    {
+      "id": "osc.wavetable",
+      "version": "2.2.1",
+      "bundleHash": "4f72d6964e7641fce8e6380d58b7a44cb611899b33bf25dce922cc5e26381167"
+    },
+    {
+      "id": "seq.step-grid",
+      "version": "3.0.0",
+      "bundleHash": "3019aaeb28c92b41ed332eee9735171cf8e1efc95a625f1b61ba910259537960"
+    },
+    {
+      "id": "clock.tempo",
+      "version": "1.0.0",
+      "bundleHash": "1c993bfbe395b30d86bd7e67141b02c54d37bb221a0cb76fe8f5a73590677dfa"
+    },
+    {
+      "id": "env.envelope",
+      "version": "2.1.4",
+      "bundleHash": "07b2d2e6af94d32913798f373925692b29a1ffd368a2ce18cd43d09734519db6"
+    },
+    {
+      "id": "amp.vca",
+      "version": "3.1.0",
+      "bundleHash": "4ee5ab17ab3c744856d8618ed05b93e6550852b2e8c11044712c16d80b34506c"
+    },
+    {
+      "id": "voice.allocation",
+      "version": "2.1.1",
+      "bundleHash": "b207073e8cc1893196c5337616e75638d6fc90030400ca33ee49a4a0dd496170"
+    },
+    {
+      "id": "voice.unison",
+      "version": "2.0.1",
+      "bundleHash": "c173fa292650e7a5a303bfa0e66d5000ea9db8380507ed995127da89bc0b43a2"
+    },
+    {
+      "id": "voice.tuning",
+      "version": "1.0.0",
+      "bundleHash": "3131ecb796638663ad0aaa9e6c114c54b0ffabf861648f016166fc193fdea25b"
+    },
+    {
+      "id": "util.tuner",
+      "version": "1.0.0",
+      "bundleHash": "b82ef4a75fecf853e3fdab88dcedfc9cb7d6fd462fc22fed7b732d0ab2fab267"
+    },
+    {
+      "id": "util.scope",
+      "version": "1.0.1",
+      "bundleHash": "b82ef4a75fecf853e3fdab88dcedfc9cb7d6fd462fc22fed7b732d0ab2fab267"
+    },
+    {
+      "id": "fx.limiter",
+      "version": "1.0.0",
+      "bundleHash": "12135aff6093e003140c4752359763052316d13cacb1ba9a77183eafeee2a217"
+    }
+  ]
+}

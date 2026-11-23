@@ -1,0 +1,164 @@
+/* The runtime's page styles: the sheet a project plays on, its background and page areas, and mod mode's overlay,
+   surface and cards. Test mode (public/index.html) and every exported synth load this same file, so a page is
+   framed and mod mode lays out identically in both; library/ui/layout.css draws the components themselves. */
+.layout2-sheet {
+  position: relative; margin: 0; overflow: visible; isolation: isolate; user-select: none; touch-action: none;
+  box-shadow: 0 0 0 1px var(--line-bright), 12px 12px 0 #06080c;
+}
+/* The page's drawing (render-svg.js renderSheetSvg) fills the sheet above its background; cells, images, control zones
+   and strings take no pointer, so presses reach the components. */
+.layout2-network { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; }
+.layout2-cell { pointer-events: none; }
+.layout2-cell-image { pointer-events: none; }
+.layout2-control-zone { pointer-events: none; }
+.layout2-component .component-frame { fill: transparent; }
+.layout2-string { pointer-events: none; }
+.layout2-sheet-background { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+/* Its box is the container the sheet animation's layer is measured in: every length of its pieces and its blur are cqmin of it (library/ui/sheet-animation.js). */
+.layout2-sheet-background { container-type: size; }
+/* The sheet gradient (library/ui/sheet-gradient.js) sits between the sheet color and its image, each a layer filling the background. */
+.layout2-sheet-layer { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* The synth's page areas (library/ui/page-areas.js): strips outside the page, placed in sheet px by renderPageAreas. */
+.layout2-sheet .page-area { position: absolute; z-index: 2; overflow: visible; }
+/* With page areas on, the sheet's border and drop shadow go around the page and its areas together (renderPageAreas). */
+.layout2-sheet.has-page-areas { box-shadow: none; }
+.layout2-sheet .page-area-frame { position: absolute; z-index: 0; pointer-events: none; box-shadow: 0 0 0 1px var(--line-bright), 12px 12px 0 #06080c; }
+.layout2-sheet.testing { cursor: default; background-image: none; }
+.layout2-sheet.testing .layout2-slots,
+.layout2-sheet.testing .layout2-pin,
+.layout2-sheet.testing .layout2-empty,
+.layout2-sheet.testing .layout2-editor-only { display: none; }
+.layout2-sheet.testing .layout2-string-hit { pointer-events: none; }
+/* Mod mode: the floating card and its callouts sit over the page in sheet px. */
+.layout2-sheet .mod-overlay { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+.layout2-sheet .mod-callouts { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.layout2-sheet .mod-card { position: absolute; z-index: 6; overflow: visible; pointer-events: auto; }
+/* The mod surface (library/ui/mod-surface.js, sketch SK023): its backdrop, the aux bands' sheets at their bands' places,
+   and its marks, all in sheet px over the page. Only the backdrop (outside the cutout), the aux pads and the marks'
+   controls take the pointer; the cutout lets it through to the selected component. Its entrance (`.entering` on the
+   overlay): the backdrop closes in from the page's edges onto the window over --mod-slide-ms (design.modMode.slideMs),
+   the window's outline closing with it as its edge (mod-ring-swoop: the same easing, so the two stay together), then
+   everything else fades in where it is over half that time (--mod-fade-ms). Its exit (`.leaving`) runs the same steps reversed and
+   takes no presses. --mod-ago is how far into either a redraw lands, so a redraw picks it up where it was. */
+.layout2-sheet .mod-surface-overlay { --mod-fade-ms: calc(var(--mod-slide-ms, 320ms) * .5); }
+.layout2-sheet .mod-surface-overlay > .mod-card { left: 0; top: 0; }
+/* Mod mode on a KFO (mod-surface.js renderModKfoVeilSvg): the veil takes no pointer, so the page's dots under it take the presses. */
+.layout2-sheet .mod-surface-overlay > .mod-kfo-veil { pointer-events: none; }
+/* Mod mode on a KFO, LFOs or ENVs hides the page areas' buttons (they take no press there): its title goes in their strip (modKfoTitleRect, modPageTitleRect). */
+.layout2-sheet.mod-area-title .page-area { visibility: hidden; }
+/* The window is cut off at the page's edges: the backdrop never paints past the page. */
+.layout2-sheet .mod-surface-overlay .mod-surface-under, .layout2-sheet .mod-surface-overlay .mod-surface-ring { pointer-events: none; overflow: hidden; }
+/* The backdrop is holed by a mask, which takes no part in hit testing: an unpainted path with the window cut out takes the presses the surface keeps from the page. */
+.layout2-sheet .mod-surface-overlay .mod-surface-block { pointer-events: fill; }
+.layout2-sheet .mod-surface-overlay .mod-surface { pointer-events: none; z-index: 7; }
+.layout2-sheet .mod-surface-overlay .mod-surface .mod-control { pointer-events: auto; cursor: pointer; }
+.layout2-sheet .mod-surface-overlay .mod-band-sheet { position: absolute; z-index: 6; pointer-events: auto; }
+.layout2-sheet .mod-surface-overlay.entering > .mod-surface-under .mod-window-hole, .layout2-sheet .mod-surface-overlay.entering > .mod-surface-ring .mod-window-ring { animation: mod-ring-swoop var(--mod-slide-ms, 320ms) cubic-bezier(.2, .7, .3, 1) calc(0ms - var(--mod-ago, 0ms)) both; }
+.layout2-sheet .mod-surface-overlay.leaving > .mod-surface-under .mod-window-hole, .layout2-sheet .mod-surface-overlay.leaving > .mod-surface-ring .mod-window-ring { animation: mod-ring-swoop var(--mod-slide-ms, 320ms) cubic-bezier(.2, .7, .3, 1) calc(var(--mod-fade-ms) - var(--mod-ago, 0ms)) reverse both; }
+.layout2-sheet .mod-surface-overlay.entering > :not(.mod-surface-under, .mod-surface-ring) { animation: mod-fade var(--mod-fade-ms) ease calc(var(--mod-slide-ms, 320ms) - var(--mod-ago, 0ms)) both; }
+.layout2-sheet .mod-surface-overlay.leaving > :not(.mod-surface-under, .mod-surface-ring) { animation: mod-fade var(--mod-fade-ms) ease calc(0ms - var(--mod-ago, 0ms)) reverse both; }
+.layout2-sheet .mod-surface-overlay.leaving, .layout2-sheet .mod-surface-overlay.leaving * { pointer-events: none !important; }
+/* The window's shift as the page goes onto or off soloKFO (`.shifting`, mod-surface.js renderModSurfaceUnderSvg `shift`):
+   the rectangular window's hole and ring shrink into the component (`.mod-shift-closing`) or grow out of it (`.mod-shift-opening`),
+   about the component's centre, with the entrance's easing and time; the component's own hole stays, fading in or out
+   where it reaches past the rectangle. What belongs to the window before (`.mod-shift-old`) is gone once the shift is over. */
+.layout2-sheet .mod-surface-overlay:not(.shifting) .mod-shift-old { display: none; }
+.layout2-sheet .mod-surface-overlay.shifting .mod-shift-closing { animation: mod-shift-close var(--mod-slide-ms, 320ms) cubic-bezier(.2, .7, .3, 1) calc(0ms - var(--mod-ago, 0ms)) both; }
+.layout2-sheet .mod-surface-overlay.shifting .mod-shift-opening { animation: mod-shift-open var(--mod-slide-ms, 320ms) cubic-bezier(.2, .7, .3, 1) calc(0ms - var(--mod-ago, 0ms)) both; }
+.layout2-sheet .mod-surface-overlay.shifting .mod-window-ring.mod-shift-closing { animation-name: mod-shift-close, mod-shift-gone; }
+.layout2-sheet .mod-surface-overlay.shifting .mod-shift-in { animation: mod-shift-in var(--mod-slide-ms, 320ms) linear calc(0ms - var(--mod-ago, 0ms)) both; }
+.layout2-sheet .mod-surface-overlay.shifting .mod-shift-out { animation: mod-shift-out var(--mod-slide-ms, 320ms) linear calc(0ms - var(--mod-ago, 0ms)) both; }
+@keyframes mod-shift-close { from { transform: none; } to { transform: scale(0); } }
+@keyframes mod-shift-open { from { transform: scale(0); } to { transform: none; } }
+@keyframes mod-shift-gone { from, 90% { visibility: visible; } to { visibility: hidden; } }
+@keyframes mod-shift-in { from { opacity: 0; } 40%, to { opacity: 1; } }
+@keyframes mod-shift-out { from, 60% { opacity: 1; } to { opacity: 0; } }
+@keyframes mod-ring-swoop { from { transform: scale(var(--mod-ring-from)); } to { transform: none; } }
+@keyframes mod-fade { from { opacity: 0; } to { opacity: 1; } }
+/* The Help card and the help hint float above mod mode's cards. */
+.layout2-sheet .help-overlay { z-index: 8; }
+.mod-pick-banner { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; align-items: baseline; gap: 10px; max-width: calc(100% - 32px); padding: 6px 14px; border: 1px solid rgba(255, 255, 255, .18); border-radius: 999px; background: rgba(10, 13, 18, .88); color: #e8edf2; font-family: var(--lm-paragraph-family); font-weight: var(--lm-paragraph-weight); font-size: var(--lm-paragraph-size); letter-spacing: var(--lm-paragraph-tracking); text-transform: var(--lm-paragraph-case, none); white-space: nowrap; pointer-events: none; box-shadow: 0 6px 18px rgba(0, 0, 0, .4); }
+.mod-pick-banner span { overflow: hidden; text-overflow: ellipsis; }
+.mod-pick-banner small { opacity: .6; }
+.mod-control { cursor: pointer; }
+.mod-control[data-mod-control="route-level"] { cursor: ew-resize; }
+.mod-control[data-mod-control="sum-level"] { cursor: ns-resize; }
+/* The palette dialogs (palette-dialogs.js): a name or hex box over the control pressed, and the hidden color
+   input a swatch opens. The editor's colors where it sets them, else an export's. */
+.palette-field-input { position: fixed; z-index: 1000; box-sizing: border-box; padding: 0 4px; font-family: var(--lm-component-family); font-weight: var(--lm-component-weight); font-size: var(--lm-component-size); letter-spacing: var(--lm-component-tracking); text-transform: var(--lm-component-case, none); line-height: 1; color: var(--text, #d8dee9); background: var(--panel, #171a21); border: 1px solid var(--accent, #6ee7b7); border-radius: 3px; outline: none; }
+.palette-swatch-input { position: fixed; left: 50%; top: 50%; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+/* Text over the synth (the note, the banner, the handbook, the diagram) is in the project's four text styles, by use
+   (library/ui/text-styles.js TEXT_USES): the runtime publishes them on the document (page-runtime.js publishIndicatorLook). */
+/* An export's short note (palette-dialogs.js; the editor shows its own toast). */
+.lemnos-toast { position: fixed; z-index: 1001; left: 50%; bottom: 40px; transform: translateX(-50%); padding: 6px 12px; font-family: var(--lm-component-family); font-weight: var(--lm-component-weight); font-size: var(--lm-component-size); letter-spacing: var(--lm-component-tracking); text-transform: var(--lm-component-case, none); line-height: 1.4; color: var(--text, #d8dee9); background: var(--panel, #171a21); border: 1px solid var(--accent, #6ee7b7); border-radius: 3px; pointer-events: none; }
+/* The learner handbook a handbook button opens (handbook-dialog.js): a page over the whole synth, in the project's
+   color groups (its variables are set on the overlay). The pointer shows over it whatever the action hid. */
+.lemnos-handbook { position: fixed; inset: 0; z-index: 1000; display: flex; padding: 2vmin; box-sizing: border-box; background: var(--handbook-page); color: var(--handbook-text); font-family: var(--lm-paragraph-family); font-weight: var(--lm-paragraph-weight); font-size: var(--lm-paragraph-size); letter-spacing: var(--lm-paragraph-tracking); text-transform: var(--lm-paragraph-case, none); line-height: 1.55; }
+.lemnos-handbook-card { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; box-sizing: border-box; background: var(--handbook-card); border: 1px solid var(--handbook-lines); border-radius: 6px; }
+.lemnos-handbook-top { display: flex; gap: 10px; }
+.lemnos-handbook-search { flex: 1; min-width: 0; padding: 6px 10px; font: inherit; color: inherit; background: transparent; border: 1px solid var(--handbook-lines); border-radius: 4px; outline: none; }
+.lemnos-handbook-search:focus { border-color: var(--handbook-text); }
+.lemnos-handbook-search::placeholder { color: var(--handbook-glyphs); }
+.lemnos-handbook button { padding: 6px 12px; font: inherit; color: inherit; background: var(--handbook-button); border: 1px solid transparent; border-radius: 4px; }
+.lemnos-handbook button:disabled { color: var(--handbook-lines); background: transparent; }
+.lemnos-handbook button[aria-current="true"], .lemnos-handbook button:focus-visible { border-color: var(--handbook-text); outline: none; }
+/* Close, as mod mode's Exit is drawn (mod-surface.js): no fill, its outline (the drawing stroke) and its word in Color 6. */
+.lemnos-handbook button[data-handbook="close"] { background: transparent; color: var(--handbook-record); border: 2px solid var(--handbook-record); border-radius: var(--handbook-round); font-family: var(--lm-paragraph-family); font-weight: var(--lm-paragraph-weight); font-size: var(--lm-paragraph-size); letter-spacing: var(--lm-paragraph-tracking); text-transform: var(--lm-paragraph-case, none); }
+.lemnos-handbook button[data-handbook="close"]:is(:hover, :focus-visible) { border-color: var(--handbook-record); filter: drop-shadow(0 0 var(--nav-press-available-glow, 8px) color-mix(in srgb, var(--handbook-record) var(--nav-press-available-glow-mix, 85%), transparent)); }
+.lemnos-handbook-letters { display: flex; flex-wrap: wrap; gap: 4px; }
+.lemnos-handbook-letters button { flex: 1 0 2em; padding: 4px 0; }
+.lemnos-handbook-read { flex: 1; min-height: 0; display: flex; gap: 10px; }
+.lemnos-handbook-body { flex: 1; min-width: 0; overflow: auto; position: relative; scrollbar-width: none; }
+.lemnos-handbook-body::-webkit-scrollbar { display: none; }
+/* The page's scroll slider (handbook-dialog.js scrollSlider), --handbook-scroll wide: a track traced in Color 2 and a
+   fill in Color 3 from the top to the handle, as mod mode's sliders are drawn (the track .7 of the handle across), and
+   the project's handle in Color 1's states (roles.js TOUCH_STATES, sized and lit by layout.css's --nav-* looks): idle a
+   hollow ring half blended into the card, under the pointer a whole ring over a half fill, held solid. --at is how far
+   the page is scrolled, 0 to 1. */
+.lemnos-handbook { --handbook-scroll: 6vw; --handbook-handle-idle: color-mix(in oklab, var(--handbook-text) 50%, var(--handbook-card)); }
+.lemnos-handbook-scroll { --at: 0; position: relative; flex: none; width: var(--handbook-scroll); touch-action: none; }
+.lemnos-handbook-scroll[data-still] { visibility: hidden; }
+.lemnos-handbook-scroll-track, .lemnos-handbook-scroll-fill { position: absolute; left: 50%; top: 0; width: 43.75%; transform: translateX(-50%); box-sizing: border-box; }
+.lemnos-handbook-scroll-track { bottom: 0; border: 1px solid var(--handbook-lines); }
+.lemnos-handbook-scroll-fill { height: calc((100% - var(--handbook-scroll)) * var(--at) + var(--handbook-scroll) / 2); background: var(--handbook-glyphs); }
+.lemnos-handbook-scroll-dot { position: absolute; left: 0; top: calc((100% - var(--handbook-scroll)) * var(--at)); width: var(--handbook-scroll); height: var(--handbook-scroll); overflow: visible; pointer-events: none; }
+.lemnos-handbook-dot { fill: transparent; stroke: var(--handbook-handle-idle); stroke-width: var(--handbook-dot-stroke); transform-box: fill-box; transform-origin: center; transform: scale(var(--nav-idle-scale, .82)); }
+.lemnos-handbook-dot.indicator-crosshair path { fill: none; }
+.lemnos-handbook-dot .indicator-hit { fill: transparent; stroke: none; }
+.lemnos-handbook-scroll:hover .lemnos-handbook-dot { fill: var(--handbook-handle-idle); stroke: var(--handbook-text); transform: scale(var(--nav-available-scale, 1.1)); filter: drop-shadow(0 0 var(--nav-available-glow, 7px) color-mix(in srgb, var(--handbook-text) var(--nav-available-glow-mix, 75%), transparent)); }
+.lemnos-handbook-scroll.held .lemnos-handbook-dot { fill: var(--handbook-text); stroke: var(--handbook-text); transform: scale(var(--nav-held-scale, 1.18)); filter: drop-shadow(0 0 var(--nav-held-glow, 9px) color-mix(in srgb, var(--handbook-text) var(--nav-held-glow-mix, 90%), transparent)); }
+.lemnos-handbook-body > * { max-width: 75ch; margin: 0 auto 14px; }
+.lemnos-handbook-entry h3 { margin: 0 0 2px; font-family: var(--lm-paragraph-family); font-weight: var(--lm-paragraph-weight); font-size: var(--lm-paragraph-size); letter-spacing: var(--lm-paragraph-tracking); text-transform: var(--lm-paragraph-case, none); }
+.lemnos-handbook-entry p { margin: 0 0 6px; }
+.lemnos-handbook-note { color: var(--handbook-glyphs); }
+.lemnos-handbook-pager { display: flex; align-items: center; justify-content: center; gap: 14px; }
+.lemnos-handbook-count { min-width: 9em; text-align: center; color: var(--handbook-glyphs); }
+html .lemnos-handbook, html .lemnos-handbook * { cursor: auto !important; }
+html .lemnos-handbook input { cursor: text !important; }
+html .lemnos-handbook button:not(:disabled), html .lemnos-handbook-scroll, html .lemnos-handbook-scroll * { cursor: pointer !important; }
+/* The architecture diagram a diagram button opens (diagram-dialog.js): the flow chart (src/shared/architecture-diagram.js)
+   on a card over the page, fitted to the window, in the project's color groups (the variables the dialog sets). Arrow
+   kinds differ by their dashes, not their hues. A press anywhere closes it. */
+.lemnos-diagram { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 4vmin; box-sizing: border-box; background: var(--diagram-backdrop); cursor: pointer; }
+.lemnos-diagram-card { max-width: 100%; max-height: 100%; padding: 2vmin; box-sizing: border-box; background: var(--diagram-card); border: 1px solid var(--diagram-lines); border-radius: 6px; display: flex; }
+.lemnos-diagram .arch-svg { width: 100%; height: auto; max-height: calc(92vh - 4vmin); }
+.lemnos-diagram .arch-lane rect { fill: none; stroke: var(--diagram-lines); stroke-opacity: .5; }
+.lemnos-diagram .arch-lane text { font-family: var(--lm-paragraph-family); font-weight: var(--lm-paragraph-weight); font-size: var(--lm-paragraph-size); letter-spacing: var(--lm-paragraph-tracking); text-transform: var(--lm-paragraph-case, none); fill: var(--diagram-glyphs); }
+.lemnos-diagram .arch-stage line { stroke: var(--diagram-lines); stroke-width: 1.5; stroke-dasharray: 8 6; }
+.lemnos-diagram .arch-stage text { font-family: var(--lm-paragraph-family); font-weight: var(--lm-paragraph-weight); font-size: var(--lm-paragraph-size); letter-spacing: var(--lm-paragraph-tracking); text-transform: var(--lm-paragraph-case, none); fill: var(--diagram-text); }
+.lemnos-diagram .arch-edge.against path.line { stroke-width: 3.5; }
+.lemnos-diagram .arch-box { fill: var(--diagram-box); stroke: var(--diagram-lines); stroke-width: 1.5; }
+.lemnos-diagram .type-custom .arch-box { stroke-dasharray: 5 4; }
+.lemnos-diagram .arch-title { font-family: var(--lm-paragraph-family); font-weight: var(--lm-paragraph-weight); font-size: var(--lm-paragraph-size); letter-spacing: var(--lm-paragraph-tracking); text-transform: var(--lm-paragraph-case, none); fill: var(--diagram-text); }
+.lemnos-diagram .arch-subtitle { font-family: var(--lm-paragraph-family); font-weight: var(--lm-paragraph-weight); font-size: var(--lm-paragraph-size); letter-spacing: var(--lm-paragraph-tracking); text-transform: var(--lm-paragraph-case, none); fill: var(--diagram-glyphs); }
+.lemnos-diagram .arch-edge path.line { fill: none; stroke: var(--diagram-glyphs); stroke-width: 1.8; }
+.lemnos-diagram .arch-edge path.line.stereo { stroke-width: 1.4; }
+.lemnos-diagram .kind-modulation path.line { stroke-dasharray: 6 5; }
+.lemnos-diagram .kind-note path.line { stroke-width: 3; }
+.lemnos-diagram .kind-trigger path.line { stroke-width: 2; stroke-dasharray: 3 3; }
+.lemnos-diagram .kind-control path.line { stroke: var(--diagram-lines); stroke-dasharray: 2 4; }
+.lemnos-diagram .kind-bias path.line { stroke-dasharray: 10 3 2 3; }
+.lemnos-diagram marker path { fill: var(--diagram-glyphs); }
+.lemnos-diagram marker path.arrow-control { fill: var(--diagram-lines); }
+.lemnos-diagram .arch-label rect { fill: var(--diagram-card); stroke: var(--diagram-lines); }
+.lemnos-diagram .arch-label text, .lemnos-diagram .arch-legend text { font-family: var(--lm-paragraph-family); font-weight: var(--lm-paragraph-weight); font-size: var(--lm-paragraph-size); letter-spacing: var(--lm-paragraph-tracking); text-transform: var(--lm-paragraph-case, none); fill: var(--diagram-text); }

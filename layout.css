@@ -1,0 +1,467 @@
+/* Lemnos layout runtime styles — the product-facing rules for the SVG that render-svg.js emits.
+   Shipped with every export and loaded by the Lemnos editor itself, so both draw identically.
+   Tokens are declared with the editor's values; a product can override them on :root. */
+:root {
+  --text: #d8dee9;
+  --panel-2: #1c2029;
+  --sunk: #0b0e12;
+  --line: #262b36;
+  --line-bright: #39404f;
+  --accent-2: #6fd6dc;
+  --lm-recording: #e5484d; /* the recording role, until the host passes the palette (Color 6) */
+}
+.layout2-network { display: block; overflow: hidden; }
+.layout2-cell { stroke: none; }
+/* The highlight (render-svg.js componentHighlight): the targeted component's edge lights — an inner glow (no edge line)
+   along its own outline in its highlight tier, its glow sized by the component (--lm-highlight-glow-width,
+   --lm-highlight-blur) and its strength by the design (--lm-highlight-intensity on the <svg>). It shows while the
+   component is targeted (.layout2-targeted: library/ui/targeting.js markTargeted, from the pointer, the stick or d-pad's
+   highlight, or keyboard focus); a page switcher's buttons each have their own. */
+.layout2-highlight { opacity: 0; pointer-events: none; transition: opacity .18s ease; }
+.layout2-highlight.layout2-targeted { opacity: 1; }
+.layout2-highlight-glow { fill: none; stroke: color-mix(in srgb, var(--lm-highlight-color) calc(56% * var(--lm-highlight-intensity, .5)), transparent); stroke-width: var(--lm-highlight-glow-width); filter: blur(var(--lm-highlight-blur)); }/* Reveal on target (design.reveal, by color group): a component's "hover" marks show only while it is targeted
+   (.layout2-targeted), its "off-hover" marks only while it is not. They move as they show (design.reveal.motion, the
+   <svg>'s data-hover-motion) about the component's centre (.layout2-hover-origin, --hover-origin), shared by every
+   wrapper of that component, so its parts stay aligned. Leaving the shown state is quick and plain; entering it is a little longer, with a slight overshoot.
+   Transitions, not keyframes, so a target that leaves mid-entrance reverses smoothly — except wiggle, which plays on
+   entrance only. */
+.layout2-hover-reveal, .layout2-hover-conceal { transform-box: fill-box; transform-origin: center; transition: opacity .15s ease-in, transform .15s ease-in; }
+.layout2-hover-origin { transform-box: view-box; transform-origin: var(--hover-origin); }
+.layout2-hover-reveal.layout2-targeted,
+.layout2-hover-conceal:not(.layout2-targeted) { transition: opacity .2s ease-out, transform .3s cubic-bezier(.34, 1.7, .64, 1); }
+.layout2-hover-reveal { opacity: 0; }
+.layout2-hover-reveal.layout2-targeted { opacity: 1; }
+.layout2-hover-conceal.layout2-targeted { opacity: 0; }
+/* The hidden state's offset per motion; the shown state is untransformed. Wiggle's off-hover elements pop. */
+[data-hover-motion="pop"] .layout2-hover-reveal,
+[data-hover-motion="pop"] .layout2-hover-conceal.layout2-targeted,
+[data-hover-motion="wiggle"] .layout2-hover-conceal.layout2-targeted { transform: scale(.94); }
+[data-hover-motion="rise"] .layout2-hover-reveal,
+[data-hover-motion="rise"] .layout2-hover-conceal.layout2-targeted { transform: translateY(5px); }
+[data-hover-motion] .layout2-hover-reveal.layout2-targeted { transform: none; }
+[data-hover-motion="wiggle"] .layout2-hover-reveal.layout2-targeted { animation: layout2-hover-wiggle .42s ease-out; }
+/* A component redrawn already targeted does not wiggle again. */
+[data-hover-motion="wiggle"] .layout2-hover-reveal.layout2-drawn-targeted { animation: none; }
+@keyframes layout2-hover-wiggle { 0% { transform: rotate(0); } 20% { transform: rotate(2.4deg); } 45% { transform: rotate(-1.9deg); } 70% { transform: rotate(.9deg); } 85% { transform: rotate(-.3deg); } 100% { transform: rotate(0); } }
+/* Devices without hover (touch) always show both, so no control becomes unreachable. */
+@media (hover: none) { .layout2-hover-reveal, .layout2-hover-conceal { opacity: 1 !important; transform: none !important; animation: none !important; } }
+.layout2-cell-address { fill: color-mix(in srgb, var(--text) 48%, transparent); font-size: 8px; letter-spacing: .11em; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+/* A label's outline is its text style's (render-svg.js labelOutline), drawn behind the fill; with none, the text is bare. */
+.layout2-cell-label { paint-order: stroke; stroke-linejoin: miter; }
+.layout2-axis { stroke-width: 1px; pointer-events: none; }
+.layout2-edge-label-path { pointer-events: none; }
+.layout2-axis-marker-glyph polyline, .layout2-glyph-label polyline { fill: none; stroke-linejoin: round; stroke-linecap: round; }
+.layout2-glyph-hit, .layout2-connection-hit { fill: transparent; stroke: none; }
+/* ---- Components: element tiers (library/ui/roles.js, CLAUDE.md) ----
+   Every mark a component draws carries one tier class, lm-role-<tier>, and maybe shape modifiers (lm-dashed, lm-bold,
+   lm-fine, lm-solid, lm-seam, lm-on, lm-selected, lm-wash). Its color and size come only from the variables render-svg sets on
+   the component (componentStyle → roles.js roleStyle): each tier its color group's color, sizes as fractions of the
+   component, so the whole drawing squishes with its cell. Each tier sets `color`, and every rule paints with currentColor,
+   so a modifier never picks a color of its own. No component rule here holds a color, a size or a fade of its own
+   (library/ui/style-rules.test.js). A pad type's own classes (adsr-pad-*, …) only name parts and drive hover. */
+.layout2-component { color: var(--lm-guide-color); stroke: currentColor; fill: none; stroke-width: var(--lm-guide-stroke); }
+.layout2-component text { fill: currentColor; stroke: none; }
+.lm-role-surface { color: var(--lm-surface-color); }
+.lm-role-well { color: var(--lm-well-color); }
+.lm-role-divider { color: var(--lm-divider-color); }
+.lm-role-guide { color: var(--lm-guide-color); }
+.lm-role-glyph2 { color: var(--lm-glyph2-color); }
+.lm-role-glyph1 { color: var(--lm-glyph1-color); }
+.lm-role-glyph3 { color: var(--lm-glyph3-color); }
+.lm-role-symbol { color: var(--lm-symbol-color); }
+.lm-role-helper { color: var(--lm-helper-color); }
+.lm-role-label { color: var(--lm-label-color); }
+.lm-role-value { color: var(--lm-value-color); }
+.lm-role-press { color: var(--lm-press-color); }
+.lm-role-indicator { color: var(--lm-handle); }
+.lm-role-highlight { color: var(--lm-highlight-color); }
+.lm-role-recording { color: var(--lm-recording-color); }
+/* The surface: the component's ground, which takes the pointer anywhere inside it. (Keyboard focus targets the component: its highlight shows.) */
+.lm-role-surface { fill: currentColor; stroke: none; }
+/* Hit regions draw nothing and still take the pointer. */
+.adsr-pad-region, .filter-pads-region, .delay-quad-pad-region, .room-reverb-pad-region, .warp-chorus-pad-region, .chorus-pad-region, .rotary-pad-region, .lfo-pad-region, .duck-pad-region, .random-pad-region, .lm-grab { fill: transparent; stroke: none; }
+.lm-role-well:is(polygon, rect, path, circle) { fill: currentColor; stroke: none; }
+.lm-role-well:is(polyline, line) { fill: none; stroke: currentColor; stroke-width: var(--lm-track-stroke); stroke-linejoin: round; }
+/* A mod mode slider's track is traced, not filled: its outline at the guide stroke. */
+.lm-role-well.mod-level-track { fill: none; stroke: currentColor; stroke-width: var(--lm-guide-stroke); }
+/* Lines: dividers and guides at the guide stroke, glyphs at the drawing stroke. */
+.lm-role-divider, .lm-role-guide { fill: none; stroke: currentColor; stroke-width: var(--lm-guide-stroke); }
+.lm-role-glyph2, .lm-role-glyph1, .lm-role-glyph3, .lm-role-symbol { fill: none; stroke: currentColor; stroke-width: var(--lm-drawing-stroke); stroke-linejoin: round; stroke-linecap: round; }
+/* The room reverb cube and its ticks keep round ends and corners even under the editor's sharp `svg *` default. */
+.room-reverb-pad-cube, .room-reverb-pad-tick { stroke-linejoin: round !important; stroke-linecap: round !important; }
+/* Words: labels and values (and any word in a line tier) fill in their tier's color. */
+.layout2-component text:is(.lm-role-label, .lm-role-value, .lm-role-glyph1, .lm-role-glyph2, .lm-role-glyph3, .lm-role-symbol, .lm-role-guide), .lm-role-label, .lm-role-value, .lm-role-helper { fill: currentColor; stroke: none; user-select: none; }
+/* Press marks (buttons) are fills of the ground at rest; lit (lm-on) they take the highlight effect in Color 1 (its glow
+   and a tint of it, at the design's highlight intensity); selected (lm-selected) a Color 1 outline. A wash is a faint
+   fill of Color 1. */
+.lm-role-press { fill: currentColor; stroke: none; pointer-events: auto; }
+.lm-role-press.lm-on { fill: color-mix(in oklab, var(--lm-press-on-color) calc(56% * var(--lm-highlight-intensity, .5)), var(--lm-press-color)); filter: drop-shadow(0 0 var(--lm-glow) var(--lm-press-on-color)); }
+.lm-role-press.lm-selected { stroke: var(--lm-press-on-color); stroke-width: var(--lm-highlight-stroke); }
+.lm-role-press.lm-wash { fill: var(--lm-handle-wash); pointer-events: none; }
+/* A recorder's Play is its whole bottom region: unlit and not highlighted it leaves the one ground showing (a divider line
+   alone separates it from the motion surface); highlighted or held it shows, under the press highlight. */
+.motion-play.lm-role-press:not(.lm-on) { fill-opacity: 0; }
+.nav-host .motion-play.lm-role-press:is(.nav-available, .nav-held) { fill-opacity: 1; }
+/* Level back and Level next: no plate of their own, highlighted or not, their word on the component's background. */
+.level-step-button.lm-role-press { fill-opacity: 0; }
+/* Pulse: a press mark slowly fading in and out of the lit look (lm-on); steady lit where motion is reduced. */
+.lm-role-press.lm-pulse { animation: lm-pulse 2.4s ease-in-out infinite; }
+@keyframes lm-pulse {
+  0%, 100% { fill: var(--lm-press-color); filter: drop-shadow(0 0 0 transparent); }
+  50% { fill: color-mix(in oklab, var(--lm-press-on-color) calc(56% * var(--lm-highlight-intensity, .5)), var(--lm-press-color)); filter: drop-shadow(0 0 var(--lm-glow) var(--lm-press-on-color)); }
+}
+.component-region-glow.lm-wash { filter: drop-shadow(0 0 var(--lm-glow) var(--lm-handle-wash)); }
+/* An indicator outside a host's states (the editor) shows its available look: a whole ring over a half fill. */
+.lm-role-indicator { fill: var(--lm-handle-fill); stroke: currentColor; stroke-width: var(--lm-indicator-stroke); }
+.lm-role-indicator.lm-role-recording { stroke: var(--lm-recording-color); }
+/* Modifiers: shape only. */
+.lm-dashed { stroke-dasharray: var(--lm-dash) var(--lm-dash); }
+.lm-bold { stroke-width: calc(var(--lm-drawing-stroke) * 1.5); stroke-linecap: round; }
+.lm-fine { stroke-width: calc(var(--lm-drawing-stroke) * .5); }
+.lm-solid { fill: currentColor; stroke: none; }
+/* The level gradient (roles.js `lm-level`; CLAUDE.md rule 1's one blend): a display that shows level as color fills each
+   point from Color 2 (quiet, the glyph2 tier's color) to Color 3 (loud, glyph3's) by its `--lm-level`, 0..1. Its own
+   color at the guide stroke closes the seam between neighbouring points. */
+.lm-role-glyph3.lm-level { color: color-mix(in oklab, var(--lm-glyph3-color) calc(var(--lm-level, 0) * 100%), var(--lm-glyph2-color)); fill: currentColor; stroke: currentColor; stroke-width: var(--lm-guide-stroke); stroke-linejoin: miter; }
+/* Text: every word a synth draws is one kind of text (library/ui/text-styles.js TEXT_KINDS) and takes its kind's style:
+   the style's font, weight, size, letter spacing, capitalization, outline and shadow, read from the variables around
+   it (text-styles.js textStyleVars, the same everywhere). A text's size is its style's: nothing scales it.
+   These rules, one per kind, are the only font rules for a synth's text (library/ui/style-rules.test.js). */
+.layout2-component text.lm-text-edge, text.lm-text-edge { font-family: var(--lm-edge-family); font-weight: var(--lm-edge-weight); font-size: var(--lm-edge-size); letter-spacing: var(--lm-edge-tracking); text-transform: var(--lm-edge-case, none); stroke: var(--lm-edge-outline, none); stroke-width: var(--lm-edge-outline-width, 0); paint-order: stroke; filter: var(--lm-edge-shadow, none); }
+.layout2-component text.lm-text-component, text.lm-text-component { font-family: var(--lm-component-family); font-weight: var(--lm-component-weight); font-size: var(--lm-component-size); letter-spacing: var(--lm-component-tracking); text-transform: var(--lm-component-case, none); stroke: var(--lm-component-outline, none); stroke-width: var(--lm-component-outline-width, 0); paint-order: stroke; filter: var(--lm-component-shadow, none); }
+.layout2-component text.lm-text-glyph, text.lm-text-glyph { font-family: var(--lm-glyph-family); font-weight: var(--lm-glyph-weight); font-size: var(--lm-glyph-size); letter-spacing: var(--lm-glyph-tracking); text-transform: var(--lm-glyph-case, none); stroke: var(--lm-glyph-outline, none); stroke-width: var(--lm-glyph-outline-width, 0); paint-order: stroke; filter: var(--lm-glyph-shadow, none); }
+.layout2-component text.lm-text-paragraph, text.lm-text-paragraph { font-family: var(--lm-paragraph-family); font-weight: var(--lm-paragraph-weight); font-size: var(--lm-paragraph-size); letter-spacing: var(--lm-paragraph-tracking); text-transform: var(--lm-paragraph-case, none); stroke: var(--lm-paragraph-outline, none); stroke-width: var(--lm-paragraph-outline-width, 0); paint-order: stroke; filter: var(--lm-paragraph-shadow, none); }
+/* Seams: a divider hidden until its band (its region or its indicator) is hovered or held; the pad rules below show them. */
+.lm-seam { opacity: 0; pointer-events: none; transition: opacity .15s ease; }
+/* Marks that are only pictures never take the pointer. */
+.lm-role-divider, .lm-role-guide, .lm-role-glyph2, .lm-role-glyph1, .lm-role-glyph3, .lm-role-symbol, .lm-role-helper, .lm-role-label, .lm-role-value { pointer-events: none; }
+/* A crosshair indicator: its arms take the stroke; the disc under them is only there to be grabbed. */
+.layout2-component-live .indicator-crosshair path, .layout2-component .indicator-crosshair path { fill: none; }
+.layout2-component-live .indicator-crosshair .indicator-hit, .layout2-component .indicator-crosshair .indicator-hit { fill: transparent; stroke: none; }
+.layout2-component-live { cursor: pointer; }
+/* The unveil ring (render-svg.js renderUnveilRings): a cell a level has just opened rings in its highlight tier (Color 1),
+   glowing, and fades out over UNVEIL_RING_SECONDS (library/ui/levels.js); a redraw resumes it by its negative delay. */
+.layout2-unveil-rings { pointer-events: none; }
+.layout2-unveil-ring { fill: none; stroke: currentColor; stroke-width: calc(var(--lm-highlight-stroke) * 1.5); stroke-linejoin: round; filter: drop-shadow(0 0 var(--lm-glow) currentColor) drop-shadow(0 0 calc(var(--lm-glow) * 2.5) currentColor); opacity: 0; animation: layout2-unveil-fade 3s ease-out forwards; /* duration: UNVEIL_RING_SECONDS, set inline */ }
+@keyframes layout2-unveil-fade { 0%, 15% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes motion-armed-blink { from { opacity: 1; } to { opacity: .35; } }
+.layout2-component.product-control { cursor: pointer; outline: none; }
+.layout2-cell-label.label-dimmed { opacity: .5; }
+/* A label a component carries dims by its tier instead (glyph2, render-svg.js labelTier). */
+.layout2-carried-labels .layout2-cell-label.label-dimmed { opacity: 1; }
+/* A mod button (render-svg.js renderButtonLabel) never takes the pointer in Test mode: action.js buttonTargetAt presses it from inside its frame, components first. */
+.layout2-sheet.testing .layout2-mod-button { pointer-events: none; }
+.layout2-string { fill: none; }
+
+/* ADSR pad: a seam between two of the three bands shows while a band it borders (its region or its indicator) is
+   hovered — or, while a stick or step drives, while that band's indicator is highlighted (.nav-available) — or while
+   it is held; otherwise the pad reads as one. */
+.adsr-pad-hover:has([data-adsr-region="attack"]:hover:not(.nav-virtual-pointer *)) .adsr-pad-seam[data-adsr-seam="0"],
+.nav-virtual-pointer .adsr-pad-hover:has([data-adsr-region="attack"].nav-available) .adsr-pad-seam[data-adsr-seam="0"],
+.adsr-pad-hover[data-adsr-held="attack"] .adsr-pad-seam[data-adsr-seam="0"],
+.adsr-pad-hover:has([data-adsr-region="decaySustain"]:hover:not(.nav-virtual-pointer *)) .adsr-pad-seam[data-adsr-seam="0"],
+.nav-virtual-pointer .adsr-pad-hover:has([data-adsr-region="decaySustain"].nav-available) .adsr-pad-seam[data-adsr-seam="0"],
+.adsr-pad-hover[data-adsr-held="decaySustain"] .adsr-pad-seam[data-adsr-seam="0"],
+.adsr-pad-hover:has([data-adsr-region="decaySustain"]:hover:not(.nav-virtual-pointer *)) .adsr-pad-seam[data-adsr-seam="1"],
+.nav-virtual-pointer .adsr-pad-hover:has([data-adsr-region="decaySustain"].nav-available) .adsr-pad-seam[data-adsr-seam="1"],
+.adsr-pad-hover[data-adsr-held="decaySustain"] .adsr-pad-seam[data-adsr-seam="1"],
+.adsr-pad-hover:has([data-adsr-region="release"]:hover:not(.nav-virtual-pointer *)) .adsr-pad-seam[data-adsr-seam="1"],
+.nav-virtual-pointer .adsr-pad-hover:has([data-adsr-region="release"].nav-available) .adsr-pad-seam[data-adsr-seam="1"],
+.adsr-pad-hover[data-adsr-held="release"] .adsr-pad-seam[data-adsr-seam="1"] { opacity: 1; }
+/* The LFO pad's glow (render-svg.js lfoWaveGlow): the wave again under itself, with the whole glow. Only its opacity moves with the LFO. */
+.lfo-pad-halo { filter: drop-shadow(0 0 calc(var(--lm-glow) * .75) currentColor) drop-shadow(0 0 calc(var(--lm-glow) * 1.75) currentColor); }
+/* ADSR pad motion: a ball flows along the running stage's line, and the sustain line lights up and glows while Sustain
+   holds. It always animates, Reduce Motion or not (the designer's choice). */
+.adsr-pad-sustain { opacity: 0; transition: opacity .12s ease; }
+.adsr-pad-sustain[data-lit] { opacity: 1; stroke-width: calc(var(--lm-drawing-stroke) * 2); filter: drop-shadow(0 0 var(--lm-glow) currentColor); }
+.adsr-pad-ball { filter: drop-shadow(0 0 var(--lm-glow) currentColor); }
+.adsr-pad-ball[data-off] { display: none; }
+/* Duck pad: its two seams fade in around the hovered or held band. */
+.duck-pad-hover:has([data-duck-region="attack"]:hover:not(.nav-virtual-pointer *)) .duck-pad-seam[data-duck-seam="0"],
+.nav-virtual-pointer .duck-pad-hover:has([data-duck-region="attack"].nav-available) .duck-pad-seam[data-duck-seam="0"],
+.duck-pad-hover[data-duck-held="attack"] .duck-pad-seam[data-duck-seam="0"],
+.duck-pad-hover:has([data-duck-region="hold"]:hover:not(.nav-virtual-pointer *)) .duck-pad-seam[data-duck-seam="0"],
+.nav-virtual-pointer .duck-pad-hover:has([data-duck-region="hold"].nav-available) .duck-pad-seam[data-duck-seam="0"],
+.duck-pad-hover[data-duck-held="hold"] .duck-pad-seam[data-duck-seam="0"],
+.duck-pad-hover:has([data-duck-region="hold"]:hover:not(.nav-virtual-pointer *)) .duck-pad-seam[data-duck-seam="1"],
+.nav-virtual-pointer .duck-pad-hover:has([data-duck-region="hold"].nav-available) .duck-pad-seam[data-duck-seam="1"],
+.duck-pad-hover[data-duck-held="hold"] .duck-pad-seam[data-duck-seam="1"],
+.duck-pad-hover:has([data-duck-region="release"]:hover:not(.nav-virtual-pointer *)) .duck-pad-seam[data-duck-seam="1"],
+.nav-virtual-pointer .duck-pad-hover:has([data-duck-region="release"].nav-available) .duck-pad-seam[data-duck-seam="1"],
+.duck-pad-hover[data-duck-held="release"] .duck-pad-seam[data-duck-seam="1"] { opacity: 1; }
+/* Chorus pad: its two seams fade in around the hovered or held pad (seam 0 borders both, seam 1 the Mix · Spread pad). */
+.chorus-pad-hover:has([data-chorus-region="mix"]:hover:not(.nav-virtual-pointer *)) .chorus-pad-seam[data-chorus-seam="0"],
+.nav-virtual-pointer .chorus-pad-hover:has([data-chorus-region="mix"].nav-available) .chorus-pad-seam[data-chorus-seam="0"],
+.chorus-pad-hover[data-chorus-held="mix"] .chorus-pad-seam[data-chorus-seam="0"],
+.chorus-pad-hover:has([data-chorus-region="lfo"]:hover:not(.nav-virtual-pointer *)) .chorus-pad-seam[data-chorus-seam="0"],
+.nav-virtual-pointer .chorus-pad-hover:has([data-chorus-region="lfo"].nav-available) .chorus-pad-seam[data-chorus-seam="0"],
+.chorus-pad-hover[data-chorus-held="lfo"] .chorus-pad-seam[data-chorus-seam="0"],
+.chorus-pad-hover:has([data-chorus-region="mix"]:hover:not(.nav-virtual-pointer *)) .chorus-pad-seam[data-chorus-seam="1"],
+.nav-virtual-pointer .chorus-pad-hover:has([data-chorus-region="mix"].nav-available) .chorus-pad-seam[data-chorus-seam="1"],
+.chorus-pad-hover[data-chorus-held="mix"] .chorus-pad-seam[data-chorus-seam="1"] { opacity: 1; }
+.random-pad-hover:has([data-random-region]:hover:not(.nav-virtual-pointer *)) .random-pad-seam,
+.nav-virtual-pointer .random-pad-hover:has([data-random-region].nav-available) .random-pad-seam,
+.random-pad-hover[data-random-held] .random-pad-seam { opacity: 1; }
+.duck-pad-ball { filter: drop-shadow(0 0 var(--lm-glow) currentColor); }
+.duck-pad-ball[data-off] { display: none; }
+.filter-pads-hover:has([data-filter-region]:hover:not(.nav-virtual-pointer *)) .filter-pads-seam,
+.nav-virtual-pointer .filter-pads-hover:has([data-filter-region].nav-available) .filter-pads-seam,
+.filter-pads-hover[data-filter-held] .filter-pads-seam { opacity: 1; }
+/* Delay quad pad: the Mix readout, the Echo lines and readouts, the window's lines and paddles, and the wall words,
+   all still. Its two seams fade in around the hovered or held region. */
+.delay-quad-pad-hover:has([data-delay-region="mix"]:hover:not(.nav-virtual-pointer *)) .delay-quad-pad-seam[data-delay-seam="0"],
+.nav-virtual-pointer .delay-quad-pad-hover:has([data-delay-region="mix"].nav-available) .delay-quad-pad-seam[data-delay-seam="0"],
+.delay-quad-pad-hover[data-delay-held="mix"] .delay-quad-pad-seam[data-delay-seam="0"],
+.delay-quad-pad-hover:has([data-delay-region="window"]:hover:not(.nav-virtual-pointer *)) .delay-quad-pad-seam[data-delay-seam="0"],
+.nav-virtual-pointer .delay-quad-pad-hover:has([data-delay-region="window"].nav-available) .delay-quad-pad-seam[data-delay-seam="0"],
+.delay-quad-pad-hover[data-delay-held="window"] .delay-quad-pad-seam[data-delay-seam="0"],
+.delay-quad-pad-hover:has([data-delay-region="window"]:hover:not(.nav-virtual-pointer *)) .delay-quad-pad-seam[data-delay-seam="1"],
+.nav-virtual-pointer .delay-quad-pad-hover:has([data-delay-region="window"].nav-available) .delay-quad-pad-seam[data-delay-seam="1"],
+.delay-quad-pad-hover[data-delay-held="window"] .delay-quad-pad-seam[data-delay-seam="1"],
+.delay-quad-pad-hover:has([data-delay-region="echo"]:hover:not(.nav-virtual-pointer *)) .delay-quad-pad-seam[data-delay-seam="0"],
+.nav-virtual-pointer .delay-quad-pad-hover:has([data-delay-region="echo"].nav-available) .delay-quad-pad-seam[data-delay-seam="0"],
+.delay-quad-pad-hover[data-delay-held="echo"] .delay-quad-pad-seam[data-delay-seam="0"],
+.delay-quad-pad-hover:has([data-delay-region="echo"]:hover:not(.nav-virtual-pointer *)) .delay-quad-pad-seam[data-delay-seam="1"],
+.nav-virtual-pointer .delay-quad-pad-hover:has([data-delay-region="echo"].nav-available) .delay-quad-pad-seam[data-delay-seam="1"],
+.delay-quad-pad-hover[data-delay-held="echo"] .delay-quad-pad-seam[data-delay-seam="1"] { opacity: 1; }
+.room-reverb-pad-hover:has([data-room-region="mix"]:hover:not(.nav-virtual-pointer *)) .room-reverb-pad-seam[data-room-seam="0"],
+.nav-virtual-pointer .room-reverb-pad-hover:has([data-room-region="mix"].nav-available) .room-reverb-pad-seam[data-room-seam="0"],
+.room-reverb-pad-hover[data-room-held="mix"] .room-reverb-pad-seam[data-room-seam="0"],
+.room-reverb-pad-hover:has([data-room-region="room"]:hover:not(.nav-virtual-pointer *)) .room-reverb-pad-seam[data-room-seam="0"],
+.nav-virtual-pointer .room-reverb-pad-hover:has([data-room-region="room"].nav-available) .room-reverb-pad-seam[data-room-seam="0"],
+.room-reverb-pad-hover[data-room-held="room"] .room-reverb-pad-seam[data-room-seam="0"],
+.room-reverb-pad-hover:has([data-room-region="room"]:hover:not(.nav-virtual-pointer *)) .room-reverb-pad-seam[data-room-seam="1"],
+.nav-virtual-pointer .room-reverb-pad-hover:has([data-room-region="room"].nav-available) .room-reverb-pad-seam[data-room-seam="1"],
+.room-reverb-pad-hover[data-room-held="room"] .room-reverb-pad-seam[data-room-seam="1"],
+.room-reverb-pad-hover:has([data-room-region="tone"]:hover:not(.nav-virtual-pointer *)) .room-reverb-pad-seam[data-room-seam="0"],
+.nav-virtual-pointer .room-reverb-pad-hover:has([data-room-region="tone"].nav-available) .room-reverb-pad-seam[data-room-seam="0"],
+.room-reverb-pad-hover[data-room-held="tone"] .room-reverb-pad-seam[data-room-seam="0"],
+.room-reverb-pad-hover:has([data-room-region="tone"]:hover:not(.nav-virtual-pointer *)) .room-reverb-pad-seam[data-room-seam="1"],
+.nav-virtual-pointer .room-reverb-pad-hover:has([data-room-region="tone"].nav-available) .room-reverb-pad-seam[data-room-seam="1"],
+.room-reverb-pad-hover[data-room-held="tone"] .room-reverb-pad-seam[data-room-seam="1"] { opacity: 1; }
+/* Warp chorus pad: the readouts and the warped lines, all still. Its one seam fades in when either region is hovered or held. */
+.warp-chorus-pad-hover:has([data-warp-region="mix"]:hover:not(.nav-virtual-pointer *)) .warp-chorus-pad-seam[data-warp-seam="0"],
+.nav-virtual-pointer .warp-chorus-pad-hover:has([data-warp-region="mix"].nav-available) .warp-chorus-pad-seam[data-warp-seam="0"],
+.warp-chorus-pad-hover[data-warp-held="mix"] .warp-chorus-pad-seam[data-warp-seam="0"],
+.warp-chorus-pad-hover:has([data-warp-region="clocks"]:hover:not(.nav-virtual-pointer *)) .warp-chorus-pad-seam[data-warp-seam="0"],
+.nav-virtual-pointer .warp-chorus-pad-hover:has([data-warp-region="clocks"].nav-available) .warp-chorus-pad-seam[data-warp-seam="0"],
+.warp-chorus-pad-hover[data-warp-held="clocks"] .warp-chorus-pad-seam[data-warp-seam="0"] { opacity: 1; }
+/* Rotary pad: the lit Mix words, the readouts, the two spirals and the wall words, all still; the Flip buttons in the
+   bottom strip. Its three seams fade in around the hovered or held band. */
+.rotary-pad-hover:has([data-rotary-region="mix"]:hover:not(.nav-virtual-pointer *)) .rotary-pad-seam[data-rotary-seam="0"],
+.nav-virtual-pointer .rotary-pad-hover:has([data-rotary-region="mix"].nav-available) .rotary-pad-seam[data-rotary-seam="0"],
+.rotary-pad-hover[data-rotary-held="mix"] .rotary-pad-seam[data-rotary-seam="0"],
+.rotary-pad-hover:has([data-rotary-region="high"]:hover:not(.nav-virtual-pointer *)) .rotary-pad-seam[data-rotary-seam="0"],
+.nav-virtual-pointer .rotary-pad-hover:has([data-rotary-region="high"].nav-available) .rotary-pad-seam[data-rotary-seam="0"],
+.rotary-pad-hover[data-rotary-held="high"] .rotary-pad-seam[data-rotary-seam="0"],
+.rotary-pad-hover:has([data-rotary-region="high"]:hover:not(.nav-virtual-pointer *)) .rotary-pad-seam[data-rotary-seam="1"],
+.nav-virtual-pointer .rotary-pad-hover:has([data-rotary-region="high"].nav-available) .rotary-pad-seam[data-rotary-seam="1"],
+.rotary-pad-hover[data-rotary-held="high"] .rotary-pad-seam[data-rotary-seam="1"],
+.rotary-pad-hover:has([data-rotary-region="high"]:hover:not(.nav-virtual-pointer *)) .rotary-pad-seam[data-rotary-seam="2"],
+.nav-virtual-pointer .rotary-pad-hover:has([data-rotary-region="high"].nav-available) .rotary-pad-seam[data-rotary-seam="2"],
+.rotary-pad-hover[data-rotary-held="high"] .rotary-pad-seam[data-rotary-seam="2"],
+.rotary-pad-hover:has([data-rotary-region="low"]:hover:not(.nav-virtual-pointer *)) .rotary-pad-seam[data-rotary-seam="0"],
+.nav-virtual-pointer .rotary-pad-hover:has([data-rotary-region="low"].nav-available) .rotary-pad-seam[data-rotary-seam="0"],
+.rotary-pad-hover[data-rotary-held="low"] .rotary-pad-seam[data-rotary-seam="0"],
+.rotary-pad-hover:has([data-rotary-region="low"]:hover:not(.nav-virtual-pointer *)) .rotary-pad-seam[data-rotary-seam="1"],
+.nav-virtual-pointer .rotary-pad-hover:has([data-rotary-region="low"].nav-available) .rotary-pad-seam[data-rotary-seam="1"],
+.rotary-pad-hover[data-rotary-held="low"] .rotary-pad-seam[data-rotary-seam="1"],
+.rotary-pad-hover:has([data-rotary-region="low"]:hover:not(.nav-virtual-pointer *)) .rotary-pad-seam[data-rotary-seam="2"],
+.nav-virtual-pointer .rotary-pad-hover:has([data-rotary-region="low"].nav-available) .rotary-pad-seam[data-rotary-seam="2"],
+.rotary-pad-hover[data-rotary-held="low"] .rotary-pad-seam[data-rotary-seam="2"],
+.rotary-pad-hover:has([data-rotary-region="crossover"]:hover:not(.nav-virtual-pointer *)) .rotary-pad-seam[data-rotary-seam="2"],
+.nav-virtual-pointer .rotary-pad-hover:has([data-rotary-region="crossover"].nav-available) .rotary-pad-seam[data-rotary-seam="2"],
+.rotary-pad-hover[data-rotary-held="crossover"] .rotary-pad-seam[data-rotary-seam="2"] { opacity: 1; }
+/* LFO pad: a wave that scrolls up on the pad's clock with a ball at its bottom end, Reduce Motion or not (the
+   designer's choice). Its two seams fade in around the hovered or held region. */
+.lfo-pad-hover:has([data-lfo-region="levelAttack"]:hover:not(.nav-virtual-pointer *)) .lfo-pad-seam[data-lfo-seam="0"],
+.nav-virtual-pointer .lfo-pad-hover:has([data-lfo-region="levelAttack"].nav-available) .lfo-pad-seam[data-lfo-seam="0"],
+.lfo-pad-hover[data-lfo-held="levelAttack"] .lfo-pad-seam[data-lfo-seam="0"],
+.lfo-pad-hover:has([data-lfo-region="levelAttack"]:hover:not(.nav-virtual-pointer *)) .lfo-pad-seam[data-lfo-seam="1"],
+.nav-virtual-pointer .lfo-pad-hover:has([data-lfo-region="levelAttack"].nav-available) .lfo-pad-seam[data-lfo-seam="1"],
+.lfo-pad-hover[data-lfo-held="levelAttack"] .lfo-pad-seam[data-lfo-seam="1"],
+.lfo-pad-hover:has([data-lfo-region="shapeRate"]:hover:not(.nav-virtual-pointer *)) .lfo-pad-seam[data-lfo-seam="0"],
+.nav-virtual-pointer .lfo-pad-hover:has([data-lfo-region="shapeRate"].nav-available) .lfo-pad-seam[data-lfo-seam="0"],
+.lfo-pad-hover[data-lfo-held="shapeRate"] .lfo-pad-seam[data-lfo-seam="0"],
+.lfo-pad-hover:has([data-lfo-region="shapeRate"]:hover:not(.nav-virtual-pointer *)) .lfo-pad-seam[data-lfo-seam="1"],
+.nav-virtual-pointer .lfo-pad-hover:has([data-lfo-region="shapeRate"].nav-available) .lfo-pad-seam[data-lfo-seam="1"],
+.lfo-pad-hover[data-lfo-held="shapeRate"] .lfo-pad-seam[data-lfo-seam="1"],
+.lfo-pad-hover:has([data-lfo-region="window"]:hover:not(.nav-virtual-pointer *)) .lfo-pad-seam[data-lfo-seam="1"],
+.nav-virtual-pointer .lfo-pad-hover:has([data-lfo-region="window"].nav-available) .lfo-pad-seam[data-lfo-seam="1"],
+.lfo-pad-hover[data-lfo-held="window"] .lfo-pad-seam[data-lfo-seam="1"] { opacity: 1; }
+/* Step sequencer: its cells and buttons (scale buttons and tonic keys included) are press marks, idle or lit (lm-on), and a
+   lit cell under the playhead glows. The playhead hides while the sequencer is stopped. */
+.step-seq-cell[data-on][data-now] { filter: drop-shadow(0 0 var(--lm-glow) var(--lm-press-on-color)); }
+.step-seq-playhead[data-off] { display: none; }
+/* The swatch role (roles.js): a color group shown as itself, in its group's color (--lm-swatch-<group>, from the palette). */
+.lm-role-swatch { fill: var(--lm-well-color); stroke: var(--lm-divider-color); stroke-width: var(--lm-guide-stroke); pointer-events: auto; }
+.lm-role-swatch[data-group="color1"] { fill: var(--lm-swatch-color1, var(--lm-well-color)); }
+.lm-role-swatch[data-group="color2"] { fill: var(--lm-swatch-color2, var(--lm-well-color)); }
+.lm-role-swatch[data-group="color3"] { fill: var(--lm-swatch-color3, var(--lm-well-color)); }
+.lm-role-swatch[data-group="color4"] { fill: var(--lm-swatch-color4, var(--lm-well-color)); }
+.lm-role-swatch[data-group="color5"] { fill: var(--lm-swatch-color5, var(--lm-well-color)); }
+.lm-role-swatch[data-group="color6"] { fill: var(--lm-swatch-color6, var(--lm-well-color)); }
+.lm-role-swatch[data-group="color7"] { fill: var(--lm-swatch-color7, var(--lm-well-color)); }
+.lm-role-swatch[data-group="color8"] { fill: var(--lm-swatch-color8, var(--lm-well-color)); }
+
+/* Palette picker (palette-picker.js): a swatch is its color alone, outlined only when picked up or the drop
+   target (Color 1, a fine selected outline); a name sits on a plate of the button fill that takes no press; a
+   code is a press area that shows nothing at rest and the button fill while targeted or held, so it takes a button's ring and glow. */
+.palette-picker-swatch { stroke: none; }
+.palette-picker-swatch.lm-selected { stroke: var(--lm-press-on-color); stroke-width: var(--lm-guide-stroke); }
+.palette-plate { pointer-events: none; }
+.palette-area { fill-opacity: 0; }
+.nav-host .palette-area:is(.nav-available, .nav-held) { fill-opacity: 1; }
+
+/*
+ * The action's states (lib/navigation/handoff.js puts the classes; these rules draw them). Feedback is state, not
+ * motion: nothing zips or moves on its own. Over a host (`.nav-host`: the Test page, mod mode, its dialog) every
+ * indicator rests idle — smaller, a hollow ring of Color 1 half blended into the ground. The highlighted target is
+ * `.nav-available` — a bit bigger, a whole ring over a half fill, a slight glow. A grabbed indicator or a held press is
+ * `.nav-held` — solid Color 1, full glow. A press, let go, is available again. The three states switch at once, like a
+ * light: no easing, no pulse.
+ * Buttons, toggles, and mod mode controls (`.nav-press`, marked by handoff.js markTargets) rest as their tier draws them;
+ * highlighted they take a tight Color 1 ring and a wide glow, and the same held look. Colors come only from the
+ * component's tiers (roles.js TOUCH_STATES); these rules move size and glow. The cursor over a host is the `#cursor-dot`
+ * (outside the component colors): big, bright, and glowing while free; while a grab holds it stands where it was as a
+ * small dim ring. Tune every look here.
+ */
+:root {
+  --nav-idle-scale: .82;
+  --nav-available-scale: 1.1; --nav-available-glow: 7px; --nav-available-glow-mix: 75%;
+  --nav-held-scale: 1.18; --nav-held-glow: 9px; --nav-held-glow-mix: 90%;
+  --nav-press-available-glow: 8px; --nav-press-available-glow-mix: 85%; --nav-press-available-ring: 1.5px;
+  --nav-press-held-glow: 12px; --nav-press-held-glow-mix: 90%;
+  /* The held cursor's dimming (it is outside the component colors, so it dims rather than blends). */
+  --nav-cursor-held-opacity: .5;
+  /* The cursor's color is the `cursor` role's group (roles.js COLOR_ROLES; a host sets --nav-cursor-color from it); its glow follows it. */
+  --nav-cursor-size: 14px; --nav-cursor-color: #eef2f8; --nav-cursor-glow: 0 0 12px 4px color-mix(in srgb, var(--nav-cursor-color) 55%, transparent);
+  --nav-cursor-held-color: var(--nav-cursor-color);
+  /* The indicator design (a standard dot's diameter and outline width): the held cursor copies an idle dot.
+     A host publishes its own on <html> (Lemnos: the project's Design → Indicator defaults). */
+  --nav-indicator-diameter: 10px; --nav-indicator-stroke: 1px;
+}
+
+/* Indicator dots on the page and on mod mode's levels (a toggle's knob is one too), in Color 1's states (roles.js
+   TOUCH_STATES): idle a hollow ring half blended into the ground, available a whole ring over a half fill, held solid. The
+   size and the glow go with the state, switched at once like a light (no easing, no pulse); the colors come only from
+   the component's tiers. */
+.nav-host :is(.component-live, .mod-level-dot) {
+  --nav-glow-color: var(--lm-handle, var(--accent-2));
+  transform-box: fill-box; transform-origin: center;
+  transform: scale(var(--nav-idle-scale)); fill: transparent; stroke: var(--lm-handle-idle, var(--nav-glow-color)); filter: none;
+}
+/* A playing KFO's indicator travels its path: never idle, solid, and edged dark so it reads on any background. */
+.nav-host .component-live.motion-playing:not(.nav-available, .nav-held) { transform: none; filter: drop-shadow(0 0 1.5px var(--motion-playing-edge, rgba(0, 0, 0, .9))); }
+.layout2-component-live .component-live.motion-playing, .nav-host .component-live.motion-playing { fill: var(--lm-handle); stroke: var(--lm-handle); stroke-width: calc(var(--lm-indicator-stroke) * 1.5); }
+.nav-host :is(.component-live, .mod-level-dot).nav-available {
+  transform: scale(var(--nav-available-scale)); fill: var(--lm-handle-fill, var(--nav-glow-color)); stroke: var(--nav-glow-color);
+  filter: drop-shadow(0 0 var(--nav-available-glow) color-mix(in srgb, var(--nav-glow-color) var(--nav-available-glow-mix), transparent));
+}
+.nav-host :is(.component-live, .mod-level-dot).nav-held {
+  /* Under control a dot is solid: its fill matches its outline. */
+  fill: var(--nav-glow-color); stroke: var(--nav-glow-color);
+  transform: scale(var(--nav-held-scale));
+  filter: drop-shadow(0 0 var(--nav-held-glow) color-mix(in srgb, var(--nav-glow-color) var(--nav-held-glow-mix), transparent));
+}
+
+/* Press targets: a recorder's Play, a pad's buttons and cells, mod mode's controls, the dialog's buttons. Idle they rest
+   as their tier draws them (a press mark's resting fill); highlighted they take a tight Color 1 ring and a wide glow, held a
+   stronger glow; let go, back to highlighted. Switched at once, like the dots. */
+.nav-host :is(.nav-press, .nav-available, .nav-held):not(.component-live):not(.mod-level-dot) {
+  --nav-glow-color: var(--lm-highlight-color, var(--accent-2));
+}
+.nav-host .nav-available:not(.component-live):not(.mod-level-dot) {
+  filter: drop-shadow(0 0 var(--nav-press-available-ring) var(--nav-glow-color)) drop-shadow(0 0 var(--nav-press-available-glow) color-mix(in srgb, var(--nav-glow-color) var(--nav-press-available-glow-mix), transparent));
+}
+.nav-host .nav-held:not(.component-live):not(.mod-level-dot) {
+  filter: drop-shadow(0 0 var(--nav-press-available-ring) var(--nav-glow-color)) drop-shadow(0 0 var(--nav-press-held-glow) color-mix(in srgb, var(--nav-glow-color) var(--nav-press-held-glow-mix), transparent));
+}
+
+/* The cursor over a host: the real one hidden, the dot in its place. While a grab holds without pointer lock, hidden everywhere. */
+/* While the highlight is stepped (keys, d-pad, a stepping stick: .nav-cursor-stepping on <html>) no cursor shows at all. */
+.nav-cursor-host, .nav-cursor-host *, .nav-handoff-active, .nav-handoff-active *, .nav-cursor-stepping, .nav-cursor-stepping * { cursor: none !important; }
+#cursor-dot {
+  /* Always a circle, even under a host stylesheet that squares every corner (Lemnos's own does, with !important). */
+  position: fixed; z-index: 2147483647; margin: 0; border-radius: 50% !important; pointer-events: none; transform: translate(-50%, -50%);
+  width: var(--nav-cursor-size); height: var(--nav-cursor-size); background: var(--nav-cursor-color); box-shadow: var(--nav-cursor-glow);
+  border: 0 solid var(--nav-cursor-held-color); box-sizing: border-box; filter: none;
+}
+/* Under control the cursor and the indicator trade looks, at once: the indicator goes solid, and the cursor becomes an
+   idle indicator in everything but color — the same size and outline, hollow and dim, no glow. */
+#cursor-dot.nav-cursor-held {
+  width: calc(var(--nav-indicator-diameter) * var(--nav-idle-scale)); height: calc(var(--nav-indicator-diameter) * var(--nav-idle-scale));
+  background: transparent;
+  border-width: calc(var(--nav-indicator-stroke) * var(--nav-idle-scale));
+  opacity: var(--nav-cursor-held-opacity); box-shadow: none;
+}
+
+/* Mod mode (library/ui/mod-mode.js, sketch SK021): every component dims — every mark it draws, by its
+   data-owner-component-id (body, live indicators, path scales, carried labels; render-svg.js renderCellContent) — but the ones the host lights with a rule
+   rendered in the same markup (the card's component and, while a row is hovered, the components that play its
+   modulators) — rendered, not added after, so a re-render never fades them in from bright; the floating Mod Card is drawn like the page, every mark in an element
+   role at the card's unit. */
+:root { --mod-dim-filter: opacity(.22) saturate(.3); --mod-dim-ms: 120ms; }
+.layout2-sheet.mod-mode [data-owner-component-id] { filter: var(--mod-dim-filter); transition: filter var(--mod-dim-ms) ease; }
+/* The mod surface's aux pads (mod-surface.js) are never dimmed: they are on the surface, not the page under it. */
+.layout2-sheet.mod-mode .mod-band-sheet [data-owner-component-id] { filter: none; }
+/* Its window's outline (mod-surface.js renderModSurfaceUnderSvg): a ring in the highlight tier (Color 1) at the drawing stroke;
+   the same window over a mod source's slot (SK026, mod-source-ring: drawn with the surface's marks, over the pads). */
+/* The hole in its backdrop is the same path in the backdrop's mask, scaled about its own centre as the ring is. */
+.mod-surface-under .mod-window-hole { transform-box: fill-box; transform-origin: center; }
+.mod-surface-ring .mod-window-ring, .mod-surface .mod-source-ring { fill: none; stroke: currentColor; stroke-width: var(--lm-drawing-stroke); pointer-events: none; vector-effect: non-scaling-stroke; transform-box: fill-box; transform-origin: center; }
+/* While Connect picks, each pickable slot is outlined in the divider tier; a picked one is covered whole in the surface
+   tier (mod-surface.js: the Cards color) and outlined as a selected press (Color 1). */
+.mod-surface .mod-pick-slot { fill: none; stroke: var(--lm-divider-color); stroke-width: var(--lm-guide-stroke); pointer-events: none; }
+.mod-surface .mod-pick-slot.picked { stroke: var(--lm-press-on-color); stroke-width: var(--lm-highlight-stroke); }
+/* The active parameter's row (mod-surface.js renderModSurfaceSvg): outlined whole as a selected press (Color 1), not filled. */
+.mod-surface .mod-param-ring { fill: none; pointer-events: none; }
+/* Its cables (mod-surface.js renderModSurfaceSvg): lines that take no pointer, in the highlight tier at the drawing stroke. */
+.mod-surface .mod-cable { fill: none; pointer-events: none; stroke-linecap: round; }
+.mod-surface .mod-cable.lm-role-highlight { stroke: currentColor; stroke-width: var(--lm-drawing-stroke); }
+/* The cards draw in the components' tiers (mod-mode.js MOD_ELEMENTS): the body is the surface, outlined as a divider.
+   A state that quiets part of a card remaps its tiers on that part, rather than fading it. */
+.mod-card .mod-card-body { stroke: var(--lm-divider-color); stroke-width: var(--lm-guide-stroke); }
+.mod-card .mod-text { user-select: none; }
+/* The sum switch: off, an idle ring with an idle knob; on, solid touch with a knob of ground. */
+.mod-card .mod-toggle-knob { fill: var(--lm-handle-idle); stroke: none; }
+.mod-card .mod-toggle[aria-checked="true"] .mod-toggle-knob { fill: var(--lm-surface-color); }
+/* A route or sum that is switched off: every tier drops to glyph2, touch to idle. */
+.mod-card :is(.mod-route, .mod-sum).off { --lm-label-color: var(--lm-glyph2-color); --lm-value-color: var(--lm-glyph2-color); --lm-glyph1-color: var(--lm-glyph2-color); --lm-symbol-color: var(--lm-glyph2-color); --lm-handle: var(--lm-handle-idle); --lm-handle-fill: transparent; }
+.mod-card .mod-label.unfolded .mod-text { text-decoration: underline; }
+/* Hovered, a row's words come up to the value tier. */
+.mod-card .mod-row:hover > .mod-label, .mod-card .mod-route:hover { --lm-label-color: var(--lm-value-color); }
+/* While Connect picks, the card's place stays plain to see: a bold dashed outline over a faint wash, breathing gently. */
+.mod-callouts .mod-card-ghost { fill: color-mix(in oklab, var(--lm-handle) 15%, transparent); animation: mod-ghost-breathe 1.6s ease-in-out infinite; }
+@keyframes mod-ghost-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .6; } }
+/* The Palette card while an own preset is dragged: the row under it (a category, or the categories' New) is ringed in
+   Color 1, as a selected press (mod-mode.js paletteDropTarget). */
+.palette-card [data-palette-drop] > .mod-hit { stroke: var(--lm-press-on-color); stroke-width: var(--lm-highlight-stroke); }
+/* The KFO card (mod-mode.js renderKfoCardSvg): Record is a dot in the recording role, solid while armed (blinking) or
+   recording; an empty slot's number is glyph2; Record, Play and the slots drop to dividers while an AUX KFO replaces the
+   SOLOKFO (the rules above). */
+.mod-card .lm-role-recording { fill: none; stroke: var(--lm-recording-color); stroke-width: var(--lm-drawing-stroke); }
+.mod-card .lm-role-recording.lm-solid { fill: var(--lm-recording-color); }
+.mod-card .kfo-armed { animation: motion-armed-blink .5s ease-in-out infinite alternate; }
+.kfo-card .kfo-button.empty { --lm-label-color: var(--lm-glyph2-color); }
+/* A disabled button (Record and Play, and the pattern cards, while an AUX KFO replaces the SOLOKFO) drops to the divider tier. */
+.kfo-card .kfo-button.disabled { --lm-label-color: var(--lm-divider-color); --lm-glyph1-color: var(--lm-divider-color); --lm-symbol-color: var(--lm-divider-color); --lm-recording-color: var(--lm-divider-color); }
+/* The selected component's recording glow: its outline in the recording role, flashing while armed, steady while recording. */
+/* The same ring on a KFO in mod mode (mod-surface.js renderModKfoVeilSvg) while it is armed or recording. */
+.mod-callouts .mod-recording, .mod-surface .mod-recording, .mod-kfo-veil .mod-recording { fill: none; stroke: var(--lm-recording-color); filter: drop-shadow(0 0 var(--lm-glow) var(--lm-recording-color)); }
+.mod-callouts .mod-recording.armed, .mod-surface .mod-recording.armed, .mod-kfo-veil .mod-recording.armed { animation: motion-armed-blink .5s ease-in-out infinite alternate; }
+/* A KFO in mod mode picking its targets: its outline over its veil in the highlight tier (Color 1), with a slight glow. */
+.mod-kfo-veil .mod-kfo-outline { fill: none; stroke: var(--lm-highlight-color); stroke-width: var(--lm-highlight-stroke); filter: drop-shadow(0 0 var(--lm-glow) var(--lm-highlight-color)); }
+/* A component the KFO drives a handle of (selected): the same glowing outline in the Record color. */
+.mod-kfo-veil .mod-kfo-outline.selected { stroke: var(--lm-recording-color); stroke-width: var(--lm-highlight-stroke); filter: drop-shadow(0 0 var(--lm-glow) var(--lm-recording-color)); }
+/* A rotate button (mod-mode.js rotateButtonMarks: a KFO target's, a soloKFO pattern's): its quad or triangle outline in the same tier, without the glow. */
+.mod-card .kfo-target-shape { fill: none; stroke: var(--lm-highlight-color); stroke-width: var(--lm-highlight-stroke); }
+/* Its ghost dot (the start corner: which way is right side up): the dot's ring, hollow, in the same tier. */
+.mod-card .kfo-target-ghost { fill: none; stroke: var(--lm-highlight-color); stroke-width: var(--lm-highlight-stroke); }
+/* The card's slider dots, drawn in the project's indicator design (indicatorMark) with the indicator role's colors and sizes. */
+.mod-card .mod-level-dot { fill: var(--lm-handle-fill); stroke: var(--lm-handle); stroke-width: var(--lm-indicator-stroke); }
+.mod-card .mod-level-dot.indicator-crosshair path { fill: none; }
+.mod-card .mod-level-dot .indicator-hit { fill: transparent; stroke: none; }
+
+/* A cell veil (levels.js; render-svg.js renderCellVeils): the page's color over a cell its level has not opened, or a window's outline. Neither takes the pointer: a veiled component offers no target. */
+.layout2-cell-veil, .layout2-cell-veil-outline { pointer-events: none; }
