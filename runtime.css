@@ -153,6 +153,10 @@ html .lemnos-prescreen button { cursor: pointer !important; }
 .lemnos-start-target { padding: 10px 24px; background: var(--prescreen-button); border: 1px solid var(--prescreen-lines); border-radius: 4px; }
 .lemnos-start:is(:hover, :focus-visible) .lemnos-start-target { border-color: var(--prescreen-text); }
 html .lemnos-start, html .lemnos-start * { cursor: pointer !important; }
+/* From the press until the sound is on: the button reads "Starting…", lit, and the hint keeps its place, hidden. */
+.lemnos-starting .lemnos-start-target { border-color: var(--prescreen-text); }
+.lemnos-starting .lemnos-start-hint { visibility: hidden; }
+html .lemnos-starting, html .lemnos-starting * { cursor: progress !important; }
 /* The update notice a published synth shows when a newer export is served (update-check.js): a small card in a corner,
    under the prescreen, in the prescreen's colors and paragraph text. The synth plays on under it. */
 .lemnos-update { position: fixed; top: 2vmin; right: 2vmin; z-index: 900; max-width: min(40ch, calc(100% - 4vmin)); display: flex; flex-direction: column; gap: 1.5vmin; padding: 2vmin; box-sizing: border-box; background: var(--prescreen-card); color: var(--prescreen-text); border: 1px solid var(--prescreen-lines); border-radius: 6px; font-family: var(--lm-paragraph-family); font-weight: var(--lm-paragraph-weight); font-size: var(--lm-paragraph-size); letter-spacing: var(--lm-paragraph-tracking); text-transform: var(--lm-paragraph-case, none); line-height: 1.4; }

@@ -18513,6 +18513,7 @@ function createPrescreen({ project: project3, doc = () => globalThis.document, l
 // library/runtime/start-screen.js
 var OVERLAY_ID4 = "lemnos-start";
 var START_TEXT = "Start sound";
+var START_BUSY_TEXT = "Starting…";
 var START_HINT = "or click anywhere, or press a key";
 function createStartScreen({ project: project3, doc = () => globalThis.document, look = () => {} }) {
   let overlay = null, onKey = null;
@@ -18533,23 +18534,31 @@ function createStartScreen({ project: project3, doc = () => globalThis.document,
     const shown = document2.createElement("div");
     overlay = shown;
     overlay.id = OVERLAY_ID4;
-    overlay.className = "lemnos-start";
     overlay.setAttribute("role", "button");
     overlay.setAttribute("tabindex", "0");
-    overlay.setAttribute("aria-label", START_TEXT);
     for (const [name, value] of Object.entries(prescreenColors(project3())))
       overlay.style.setProperty(name, value);
-    overlay.innerHTML = `<span class="lemnos-start-target">${esc(START_TEXT)}</span><span class="lemnos-start-hint">${esc(START_HINT)}</span>`;
+    const draw = (busy) => {
+      const words = busy ? START_BUSY_TEXT : START_TEXT;
+      shown.className = busy ? "lemnos-start lemnos-starting" : "lemnos-start";
+      shown.setAttribute("aria-busy", String(busy));
+      shown.setAttribute("aria-label", words);
+      shown.innerHTML = `<span class="lemnos-start-target">${esc(words)}</span><span class="lemnos-start-hint">${esc(START_HINT)}</span>`;
+    };
+    draw(false);
     let starting = false;
     const press = async () => {
       if (starting)
         return;
       starting = true;
+      draw(true);
       let started = false;
       try {
         started = await start() !== false;
       } finally {
         starting = false;
+        if (!started && overlay === shown)
+          draw(false);
       }
       if (started && overlay === shown)
         close();
@@ -21861,8 +21870,10 @@ var saver = createStateSaver({ project: project3, factory: restored.factory });
 var routes = liveRouteStore(project3);
 var navigation = projectNavigation(project3, library);
 var player = null;
+var ENGINE_WASM = "engine.wasm";
+var engineModule = fetch(ENGINE_WASM).then((response) => response.ok ? response.arrayBuffer() : null).then((bytes) => bytes && WebAssembly.compile(bytes)).catch(() => null);
 var sound = createSound({
-  build: async () => ({ wasm: "engine.wasm", worklet: "worklet.js", issues: issues || [] }),
+  build: async () => ({ wasm: await engineModule || ENGINE_WASM, worklet: "worklet.js", issues: issues || [] }),
   paramValues: () => paramLookup(project3, library, { routes, midiValues: player?.runtime.midi.values, motion: player?.runtime.motion.paramValue(), keyValues: player?.runtime.pitchKey.values() })
 });
 var MARGIN3 = 0;
