@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ravakele</title>
-<meta name="lemnos-build" content="c79eaa330f721bbf">
+<meta name="lemnos-build" content="e744c6e78dfcb851">
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="layout.css">
 <link rel="stylesheet" href="runtime.css">
@@ -12,8 +12,6 @@
 html, body { margin: 0; height: 100%; background: #0f1115; color: #d8dee9; font: 13px/1.4 ui-monospace, monospace; overflow: hidden; }
 #stage { position: absolute; inset: 0; display: grid; place-items: center; }
 #synth { display: grid; place-items: center; }
-#start { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(15, 17, 21, .6); border: 0; color: inherit; font: inherit; font-size: 15px; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
-#start[hidden] { display: none; }
 #status { position: absolute; left: 12px; bottom: 10px; color: #8b93a7; }
 #issues-toggle { position: absolute; right: 12px; bottom: 8px; background: transparent; border: 1px solid #39404f; color: #8b93a7; font: inherit; padding: 2px 8px; cursor: pointer; }
 #issues-toggle[hidden], #issues[hidden] { display: none; }
@@ -26,7 +24,6 @@ html, body { margin: 0; height: 100%; background: #0f1115; color: #d8dee9; font:
 </head>
 <body>
 <div id="stage"><div id="synth"></div></div>
-<button id="start">Click or press a key to start the sound</button>
 <div id="status"></div>
 <button id="issues-toggle" hidden aria-expanded="false"></button>
 <div id="issues" hidden></div>

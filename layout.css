@@ -90,7 +90,7 @@
 /* The room reverb cube and its ticks keep round ends and corners even under the editor's sharp `svg *` default. */
 .room-reverb-pad-cube, .room-reverb-pad-tick { stroke-linejoin: round !important; stroke-linecap: round !important; }
 /* Words: labels and values (and any word in a line tier) fill in their tier's color. */
-.layout2-component text:is(.lm-role-label, .lm-role-value, .lm-role-glyph1, .lm-role-glyph2, .lm-role-glyph3, .lm-role-symbol, .lm-role-guide), .lm-role-label, .lm-role-value, .lm-role-helper { fill: currentColor; stroke: none; user-select: none; }
+.layout2-component text:is(.lm-role-label, .lm-role-value, .lm-role-glyph1, .lm-role-glyph2, .lm-role-glyph3, .lm-role-symbol, .lm-role-guide), .lm-role-label, .lm-role-value, .lm-role-helper { fill: currentColor; stroke: none; user-select: none; -webkit-user-select: none; }
 /* Press marks (buttons) are fills of the ground at rest; lit (lm-on) they take the highlight effect in Color 1 (its glow
    and a tint of it, at the design's highlight intensity); selected (lm-selected) a Color 1 outline. A wash is a faint
    fill of Color 1. */
@@ -419,7 +419,7 @@
 /* The cards draw in the components' tiers (mod-mode.js MOD_ELEMENTS): the body is the surface, outlined as a divider.
    A state that quiets part of a card remaps its tiers on that part, rather than fading it. */
 .mod-card .mod-card-body { stroke: var(--lm-divider-color); stroke-width: var(--lm-guide-stroke); }
-.mod-card .mod-text { user-select: none; }
+.mod-card .mod-text { user-select: none; -webkit-user-select: none; }
 /* The sum switch: off, an idle ring with an idle knob; on, solid touch with a knob of ground. */
 .mod-card .mod-toggle-knob { fill: var(--lm-handle-idle); stroke: none; }
 .mod-card .mod-toggle[aria-checked="true"] .mod-toggle-knob { fill: var(--lm-surface-color); }

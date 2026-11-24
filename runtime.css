@@ -2,7 +2,7 @@
    surface and cards. Test mode (public/index.html) and every exported synth load this same file, so a page is
    framed and mod mode lays out identically in both; library/ui/layout.css draws the components themselves. */
 .layout2-sheet {
-  position: relative; margin: 0; overflow: visible; isolation: isolate; user-select: none; touch-action: none;
+  position: relative; margin: 0; overflow: visible; isolation: isolate; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none;
   box-shadow: 0 0 0 1px var(--line-bright), 12px 12px 0 #06080c;
 }
 /* The page's drawing (render-svg.js renderSheetSvg) fills the sheet above its background; cells, images, control zones
@@ -146,6 +146,13 @@ html .lemnos-handbook button:not(:disabled), html .lemnos-handbook-scroll, html 
 .lemnos-prescreen button:is(:hover, :focus-visible) { border-color: var(--prescreen-text); outline: none; }
 html .lemnos-prescreen, html .lemnos-prescreen * { cursor: auto !important; }
 html .lemnos-prescreen button { cursor: pointer !important; }
+/* The start screen of an exported synth (start-screen.js): the page's color as a wash over the whole synth, which shows
+   through it blurred, with a Start sound button to aim at; the whole screen is the button. Under the prescreen and the
+   update notice, in the prescreen's colors and paragraph text. */
+.lemnos-start { position: fixed; inset: 0; z-index: 800; display: grid; place-content: center; justify-items: center; gap: 2vmin; padding: 6vmin; box-sizing: border-box; background: color-mix(in srgb, var(--prescreen-page) 60%, transparent); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); color: var(--prescreen-text); font-family: var(--lm-paragraph-family); font-weight: var(--lm-paragraph-weight); font-size: var(--lm-paragraph-size); letter-spacing: var(--lm-paragraph-tracking); text-transform: var(--lm-paragraph-case, none); line-height: 1.4; text-align: center; user-select: none; -webkit-user-select: none; outline: none; }
+.lemnos-start-target { padding: 10px 24px; background: var(--prescreen-button); border: 1px solid var(--prescreen-lines); border-radius: 4px; }
+.lemnos-start:is(:hover, :focus-visible) .lemnos-start-target { border-color: var(--prescreen-text); }
+html .lemnos-start, html .lemnos-start * { cursor: pointer !important; }
 /* The update notice a published synth shows when a newer export is served (update-check.js): a small card in a corner,
    under the prescreen, in the prescreen's colors and paragraph text. The synth plays on under it. */
 .lemnos-update { position: fixed; top: 2vmin; right: 2vmin; z-index: 900; max-width: min(40ch, calc(100% - 4vmin)); display: flex; flex-direction: column; gap: 1.5vmin; padding: 2vmin; box-sizing: border-box; background: var(--prescreen-card); color: var(--prescreen-text); border: 1px solid var(--prescreen-lines); border-radius: 6px; font-family: var(--lm-paragraph-family); font-weight: var(--lm-paragraph-weight); font-size: var(--lm-paragraph-size); letter-spacing: var(--lm-paragraph-tracking); text-transform: var(--lm-paragraph-case, none); line-height: 1.4; }

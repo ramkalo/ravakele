@@ -1081,10 +1081,10 @@ class Global {
 
   /** Adds its outputs the filter pads show into the spectra (runtime.hpp Synth::block): each the mean of its channels. */
   void spectrum(float* const* out, int n) const noexcept {
-    sumScaled(out[1], buf[6], 1.0f / 2, n);
-    sumScaled(out[1], buf[7], 1.0f / 2, n);
-    sumScaled(out[2], buf[4], 1.0f / 2, n);
-    sumScaled(out[2], buf[5], 1.0f / 2, n);
+    sumScaled(out[1], buf[4], 1.0f / 2, n);
+    sumScaled(out[1], buf[5], 1.0f / 2, n);
+    sumScaled(out[2], buf[6], 1.0f / 2, n);
+    sumScaled(out[2], buf[7], 1.0f / 2, n);
     sumScaled(out[3], buf[0], 1.0f / 2, n);
     sumScaled(out[3], buf[1], 1.0f / 2, n);
   }
@@ -1426,7 +1426,7 @@ constexpr int WATCH_COUNT = 99;
 
 /** The spectra (Synth::spectrum): each the newest output of a filter a filter pad shows, a Waterfall block a waterfall graph shows or a Scope block an oscilloscope shows, every voice's summed, by address. */
 constexpr int SPECTRUM_COUNT = 4;
-constexpr const char* SPECTRA[] = {"FILTER.DSP003", "SCOPE.DSP030", "SCOPE.DSP029", "TUNER.DSP028"};
+constexpr const char* SPECTRA[] = {"FILTER.DSP003", "SCOPE.DSP029", "SCOPE.DSP030", "TUNER.DSP028"};
 
 }  // namespace generated
 }  // namespace lemnos

@@ -14783,15 +14783,19 @@ function listCardMarks(options, row) {
     return `<g class="mod-control ${kind}-card-item${chosen ? " open" : ""}" ${controlAttributes(control)}${extra} role="option" aria-selected="${chosen}">${hit(b)}${wash}${say(words, box(b.x + row * 0.22, b.y, b.width - row * 0.44, b.height), "names", chosen ? { tier: "label" } : {})}</g>`;
   };
   const button = (b, control, words, { selected = false, kind, extra = "" } = {}) => {
-    const inner = box(b.x + b.width * 0.04, b.y + b.height * 0.15, b.width * 0.92, b.height * 0.7), room = box(b.x + b.width * 0.08, b.y, b.width * 0.84, b.height);
+    const inner2 = box(b.x + b.width * 0.04, b.y + b.height * 0.15, b.width * 0.92, b.height * 0.7), room2 = box(b.x + b.width * 0.08, b.y, b.width * 0.84, b.height);
     if (!control)
-      return `<g class="mod-control ${kind}-card-button disabled" role="button" aria-disabled="true">${say(words, room, "buttonText", { anchor: "middle", tier: "glyph2" })}</g>`;
-    const frame = selected ? rect(inner, "lm-role-press lm-selected", radius(inner)) : rect(inner, "lm-role-divider lm-dashed", `${radius(inner)}${look.paint("frames")}`);
-    return `<g class="mod-control ${kind}-card-button${selected ? " open" : ""}" ${controlAttributes(control)}${extra} role="button" aria-label="${escOrBlank(words)}">${hit(b)}${frame}${say(words, room, "buttonText", { anchor: "middle" })}</g>`;
+      return `<g class="mod-control ${kind}-card-button disabled" role="button" aria-disabled="true">${say(words, room2, "buttonText", { anchor: "middle", tier: "glyph2" })}</g>`;
+    const frame = selected ? rect(inner2, "lm-role-press lm-selected", radius(inner2)) : rect(inner2, "lm-role-divider lm-dashed", `${radius(inner2)}${look.paint("frames")}`);
+    return `<g class="mod-control ${kind}-card-button${selected ? " open" : ""}" ${controlAttributes(control)}${extra} role="button" aria-label="${escOrBlank(words)}">${hit(b)}${frame}${say(words, room2, "buttonText", { anchor: "middle" })}</g>`;
   };
-  return { say, line, body, entry, button };
+  const inner = (b) => box(b.x + b.width * 0.04, b.y + b.height * 0.15, b.width * 0.92, b.height * 0.7);
+  const room = (b) => box(b.x + b.width * 0.08, b.y, b.width * 0.84, b.height);
+  const pressButton = (b, control, words, { kind } = {}) => `<g class="mod-control ${kind}-card-button" ${controlAttributes(control)} role="button" aria-label="${escOrBlank(words)}">${hit(b)}${rect(inner(b), "lm-role-press", radius(inner(b)))}${say(words, room(b), "buttonText", { anchor: "middle" })}</g>`;
+  const exit = (b, control, words, { kind } = {}) => `<g class="mod-control ${kind}-card-button mod-exit" ${controlAttributes(control)} role="button" aria-label="${escOrBlank(words)}">${hit(b)}${rect(inner(b), "lm-role-recording", `${radius(inner(b))}${look.paint("frames")}`)}${say(words, room(b), "buttonText", { anchor: "middle", tier: "recording" })}</g>`;
+  return { say, line, body, entry, button, pressButton, exit };
 }
-var LEVEL_CARD_WORDS = Object.freeze({ world: "World", level: "Level", close: "Close", page: "Page", none: "No levels yet" });
+var LEVEL_CARD_WORDS = Object.freeze({ world: "World", level: "Level", exit: "EXIT", page: "Page", none: "No levels yet" });
 var LEVEL_CARD_LIST_ROWS = 10;
 function columnPage(count, at, page) {
   const pages = Math.max(1, Math.ceil(count / LEVEL_CARD_LIST_ROWS));
@@ -14864,16 +14868,16 @@ function levelCardControls(model, layout) {
 function renderLevelCardSvg(model, layout, options = {}) {
   const unit = num(options.unit, REFERENCE_UNIT), W = LEVEL_CARD_WORDS, r = layout.rect, row = layout.row, kind = "level";
   const controls = new Map(levelCardControls(model, layout).map((control) => [control.id, control]));
-  const { say, line, body, entry, button } = listCardMarks(options, row);
+  const { say, line, body, entry, pressButton, exit } = listCardMarks(options, row);
   const worlds = model.worlds.shown.map((item, index) => entry(layout.world.rows[index], controls.get(`lvl-world:${item.id}`), item.title, item.id === model.world, { kind })).join("");
   const levels = model.levels.shown.map((item, index) => entry(layout.level.rows[index], controls.get(`lvl-level:${item.id}`), item.title, item.id === model.current, { kind })).join("");
   const empty = model.levels.items.length ? "" : say(W.none, box(layout.split + row * 0.44, r.y + row, r.x + r.width - layout.split - row * 0.88, row), "notes", { kind: "paragraph" });
-  const pagesOf = (column, control, page) => column.pageLabel ? button(column.pagePrev, controls.get(`${control}-prev`), PALETTE_PREV_SYMBOL, { kind }) + say(`${W.page} ${page.page + 1} / ${page.pages}`, column.pageLabel, "readout", { anchor: "middle" }) + button(column.pageNext, controls.get(`${control}-next`), PALETTE_NEXT_SYMBOL, { kind }) : "";
+  const pagesOf = (column, control, page) => column.pageLabel ? pressButton(column.pagePrev, controls.get(`${control}-prev`), PALETTE_PREV_SYMBOL, { kind }) + say(`${W.page} ${page.page + 1} / ${page.pages}`, column.pageLabel, "readout", { anchor: "middle" }) + pressButton(column.pageNext, controls.get(`${control}-next`), PALETTE_NEXT_SYMBOL, { kind }) : "";
   const pages = pagesOf(layout.world, "lvl-world-page", model.worlds) + pagesOf(layout.level, "lvl-level-page", model.levels);
   const across3 = (y) => line(r.x, y, r.x + r.width, y);
   const dividers = across3(r.y + row) + line(layout.split, r.y + row, layout.split, layout.bottomTop) + across3(layout.pagesTop) + across3(layout.bottomTop);
   const headings = say(W.world, layout.world.heading, "paramLabel", { anchor: "middle", kind: "paragraph" }) + say(W.level, layout.level.heading, "paramLabel", { anchor: "middle", kind: "paragraph" });
-  const close = button(layout.close, controls.get("lvl-close"), W.close, { kind });
+  const close = exit(layout.close, controls.get("lvl-close"), W.exit, { kind });
   return `<svg class="mod-card level-card" id="layout2-level-card" viewBox="${round3(r.x)} ${round3(r.y)} ${round3(r.width)} ${round3(r.height)}" width="${round3(r.width)}" height="${round3(r.height)}"${options.attributes ? ` ${options.attributes}` : ""}>${roleRoot(options, unit)}${body(r)}${dividers}${headings}<g class="level-card-list" data-level-list="world" role="listbox" aria-label="${escOrBlank(W.world)}">${worlds}</g><g class="level-card-list" data-level-list="level" role="listbox" aria-label="${escOrBlank(W.level)}">${levels}${empty}</g><g class="level-card-pages">${pages}</g>${close}</g></svg>`;
 }
 var ANIMATION_CARD_WORDS = Object.freeze({ category: "Category", animation: "Animation" });
@@ -18506,8 +18510,67 @@ function createPrescreen({ project: project3, doc = () => globalThis.document, l
   return { show, open, close };
 }
 
+// library/runtime/start-screen.js
+var OVERLAY_ID4 = "lemnos-start";
+var START_TEXT = "Start sound";
+var START_HINT = "or click anywhere, or press a key";
+function createStartScreen({ project: project3, doc = () => globalThis.document, look = () => {} }) {
+  let overlay = null, onKey = null;
+  function close() {
+    if (!overlay)
+      return;
+    overlay.remove();
+    globalThis.removeEventListener?.("keydown", onKey, true);
+    overlay = null;
+    onKey = null;
+  }
+  function open({ start = () => true } = {}) {
+    const document2 = doc();
+    if (!document2?.body)
+      return;
+    close();
+    look();
+    const shown = document2.createElement("div");
+    overlay = shown;
+    overlay.id = OVERLAY_ID4;
+    overlay.className = "lemnos-start";
+    overlay.setAttribute("role", "button");
+    overlay.setAttribute("tabindex", "0");
+    overlay.setAttribute("aria-label", START_TEXT);
+    for (const [name, value] of Object.entries(prescreenColors(project3())))
+      overlay.style.setProperty(name, value);
+    overlay.innerHTML = `<span class="lemnos-start-target">${esc(START_TEXT)}</span><span class="lemnos-start-hint">${esc(START_HINT)}</span>`;
+    let starting = false;
+    const press = async () => {
+      if (starting)
+        return;
+      starting = true;
+      let started = false;
+      try {
+        started = await start() !== false;
+      } finally {
+        starting = false;
+      }
+      if (started && overlay === shown)
+        close();
+    };
+    overlay.addEventListener("click", press);
+    overlay.addEventListener("pointerdown", (event) => event.stopPropagation());
+    onKey = (event) => {
+      if (event.target?.closest?.('[role="dialog"]'))
+        return;
+      event.stopPropagation();
+      press();
+    };
+    globalThis.addEventListener?.("keydown", onKey, true);
+    document2.body.append(overlay);
+    overlay.focus?.();
+  }
+  return { open, close };
+}
+
 // library/runtime/update-check.js
-var OVERLAY_ID4 = "lemnos-update";
+var OVERLAY_ID5 = "lemnos-update";
 var UPDATE_TEXT = "A newer version of this synth is available.";
 var VERSION_FILE = "version.json";
 var BUILD_META = "lemnos-build";
@@ -18553,7 +18616,7 @@ function createUpdateCheck({
     close();
     look();
     overlay = document2.createElement("div");
-    overlay.id = OVERLAY_ID4;
+    overlay.id = OVERLAY_ID5;
     overlay.className = "lemnos-update";
     overlay.setAttribute("role", "status");
     for (const [name, value] of Object.entries(prescreenColors(project3())))
@@ -19023,6 +19086,7 @@ function createPageRuntime(options) {
   const diagram = createDiagramDialog({ project: project3, library, doc: () => opt.doc });
   const handbook = createHandbookDialog({ project: project3, url: opt.handbookUrl, doc: () => opt.doc });
   const prescreen = createPrescreen({ project: project3, doc: () => opt.doc, look: () => publishIndicatorLook() });
+  const startScreen = createStartScreen({ project: project3, doc: () => opt.doc, look: () => publishIndicatorLook() });
   const updateCheck = createUpdateCheck({ project: project3, doc: () => opt.doc, look: () => publishIndicatorLook(), save: () => opt.persist() });
   const levels = createLevels({ project: project3, persist: () => opt.persist(), render: () => opt.render(), doc: () => opt.doc });
   function pageHooks({ switchPage, applyPalette: applyPalette2, patchRecalled } = {}) {
@@ -19097,7 +19161,7 @@ function createPageRuntime(options) {
   const tuners = createTuners({ project: project3, sound: opt.sound, root: opt.doc, host: padHost });
   const pitchKey = createPitchShiftKey({ project: project3, sound: opt.sound });
   const modWheel = createModWheel({ project: project3, library, sound: opt.sound, midiValues: () => midiIn.values });
-  return { renderOptions: renderOptions2, patchLive, patchPaxDisplays, followTwinsOnPage, pageRecorders, publishLookSources, publishIndicatorLook, setTarget, pageHooks, sendSound, kfoTargets, soloStore, motionRuntime, motionStateFor, motion: motion2, midi: midiIn, pitchKey, modWheel, levels, edgeLabels, prescreen, updateCheck };
+  return { renderOptions: renderOptions2, patchLive, patchPaxDisplays, followTwinsOnPage, pageRecorders, publishLookSources, publishIndicatorLook, setTarget, pageHooks, sendSound, kfoTargets, soloStore, motionRuntime, motionStateFor, motion: motion2, midi: midiIn, pitchKey, modWheel, levels, edgeLabels, prescreen, startScreen, updateCheck };
 }
 
 // library/runtime/palette-dialogs.js
@@ -21789,7 +21853,6 @@ function createStateSaver({ project: project3, storage = globalThis.localStorage
 
 // library/runtime/synth-page.js
 var root = document.querySelector("#synth");
-var start = document.querySelector("#start");
 var status = document.querySelector("#status");
 var [project3, library, issues] = await Promise.all(["project.json", "library.json", "issues.json"].map((path) => fetch(path).then((response) => response.ok ? response.json() : null).catch(() => null)));
 document.title = project3.name || document.title;
@@ -21804,6 +21867,7 @@ var sound = createSound({
 });
 var MARGIN3 = 0;
 player = createPlayer({ root, project: project3, library, sound, routes, persist: saver.save, frame: () => ({ width: innerWidth - 2 * MARGIN3, height: innerHeight - 2 * MARGIN3 }) });
+player.runtime.startScreen.open({ start: startSound });
 if (restored.motion) {
   PATCH_MOTION_SOURCE.restore(restored.motion);
   player.draw();
@@ -21835,17 +21899,15 @@ navigator.requestMIDIAccess?.().then((access) => {
 }).catch(() => {});
 async function startSound() {
   if (sound.on)
-    return;
+    return Boolean(sound.engine);
   status.textContent = "Starting…";
   await sound.start(project3);
   if (sound.engine) {
-    start.hidden = true;
     status.textContent = "";
-    return;
+    return true;
   }
   const message = sound.message;
   sound.stop();
   status.textContent = `The engine did not start: ${message}`;
+  return false;
 }
-start.addEventListener("click", startSound);
-window.addEventListener("keydown", startSound, { once: true });
